@@ -4,7 +4,7 @@ const router = express.Router();
 
 const {
   checkUserEligibility,
-} = require("../controllers/eligibilityController");
+} = require("../controllers/eligibilitycontroller");
 
 // Check user's eligibility
 router.post("/check", checkUserEligibility);
