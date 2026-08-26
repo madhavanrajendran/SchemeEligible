@@ -44,24 +44,14 @@ const schemes = [
         name: "schoolType",
         label: "School Type",
         type: "select",
-        options: [
-          "Government",
-          "Government-Aided",
-          "Private",
-          "Other"
-        ],
+        options: ["Government", "Government-Aided", "Private", "Other"],
         required: true,
       },
       {
         name: "course",
         label: "Current Course",
         type: "select",
-        options: [
-          "Undergraduate Degree",
-          "Diploma",
-          "ITI",
-          "Other",
-        ],
+        options: ["Undergraduate Degree", "Diploma", "ITI", "Other"],
         required: true,
       },
       {
@@ -140,10 +130,7 @@ const schemes = [
         name: "electricityConsumption",
         label: "Annual Household Electricity Consumption",
         type: "select",
-        options: [
-          "Up to 3,600 units",
-          "Above 3,600 units",
-        ],
+        options: ["Up to 3,600 units", "Above 3,600 units"],
         required: true,
       },
     ],
@@ -184,14 +171,7 @@ const schemes = [
         name: "community",
         label: "Community",
         type: "select",
-        options: [
-          "SC",
-          "ST",
-          "BC",
-          "MBC",
-          "DNC",
-          "Other",
-        ],
+        options: ["SC", "ST", "BC", "MBC", "DNC", "Other"],
         required: true,
       },
       {
@@ -220,11 +200,7 @@ const schemes = [
         name: "institutionType",
         label: "Institution Type",
         type: "select",
-        options: [
-          "Government",
-          "Government-Aided",
-          "Other",
-        ],
+        options: ["Government", "Government-Aided", "Other"],
         required: true,
       },
       {
@@ -234,9 +210,11 @@ const schemes = [
         required: true,
       },
       {
-        name: "cgpa",
-        label: "Previous Academic CGPA",
+        name: "percentage",
+        label: "Previous Academic Percentage (%)",
         type: "number",
+        min: "0",
+        max: "100",
         step: "0.01",
         required: true,
       },
@@ -291,11 +269,7 @@ const schemes = [
         name: "institutionType",
         label: "Institution Type",
         type: "select",
-        options: [
-          "Government",
-          "Government-Aided",
-          "Other",
-        ],
+        options: ["Government", "Government-Aided", "Other"],
         required: true,
       },
       {
@@ -322,10 +296,7 @@ const schemes = [
         name: "studentStatus",
         label: "Current Student Status",
         type: "select",
-        options: [
-          "Currently Enrolled",
-          "Not Currently Enrolled",
-        ],
+        options: ["Currently Enrolled", "Not Currently Enrolled"],
         required: true,
       },
     ],
@@ -366,15 +337,7 @@ const schemes = [
         name: "community",
         label: "Community",
         type: "select",
-        options: [
-          "SC",
-          "SCC",
-          "ST",
-          "BC",
-          "MBC",
-          "DNC",
-          "Other",
-        ],
+        options: ["SC", "SCC", "ST", "BC", "MBC", "DNC", "Other"],
         required: true,
       },
       {
@@ -387,12 +350,7 @@ const schemes = [
         name: "program",
         label: "Programme",
         type: "select",
-        options: [
-          "Master's Degree",
-          "PhD",
-          "Post-Doctoral Research",
-          "Other",
-        ],
+        options: ["Master's Degree", "PhD", "Post-Doctoral Research", "Other"],
         required: true,
       },
       {
@@ -409,16 +367,14 @@ const schemes = [
       },
       {
         name: "admission",
-        label:
-          "Do you have confirmed admission to a foreign university?",
+        label: "Do you have confirmed admission to a foreign university?",
         type: "select",
         options: ["Yes", "No"],
         required: true,
       },
       {
         name: "qsRanking",
-        label:
-          "Is the university within the required QS Top 1,000 ranking?",
+        label: "Is the university within the required QS Top 1,000 ranking?",
         type: "select",
         options: ["Yes", "No", "Not Sure"],
         required: true,
@@ -457,9 +413,7 @@ function Schemes() {
 
       <main className="mx-auto max-w-7xl px-6 py-16">
         <div className="mb-10">
-          <p className="text-sm font-medium text-gray-500">
-            AVAILABLE SCHEMES
-          </p>
+          <p className="text-sm font-medium text-gray-500">AVAILABLE SCHEMES</p>
 
           <h1 className="mt-2 text-4xl font-bold tracking-tight">
             Choose a scheme
@@ -471,10 +425,7 @@ function Schemes() {
           </p>
         </div>
 
-        <SchemeGrid
-          schemes={schemes}
-          onSelect={handleSelect}
-        />
+        <SchemeGrid schemes={schemes} onSelect={handleSelect} />
       </main>
     </div>
   );

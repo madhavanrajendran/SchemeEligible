@@ -5,9 +5,7 @@ const checkEligibility = async (schemeId, userData) => {
   // FIND SELECTED SCHEME
   // =========================================================
 
-  const scheme = schemes.find(
-    (scheme) => scheme.id === schemeId
-  );
+  const scheme = schemes.find((scheme) => scheme.id === schemeId);
 
   if (!scheme) {
     throw new Error("Scheme not found");
@@ -16,21 +14,18 @@ const checkEligibility = async (schemeId, userData) => {
   const rules = scheme.eligibility;
 
 
+
   // =========================================================
   // GENDER CHECK
   // =========================================================
 
-  if (
-    rules.gender &&
-    !rules.gender.includes(userData.gender)
-  ) {
+  if (rules.gender && !rules.gender.includes(userData.gender)) {
     return {
       eligible: false,
       scheme: scheme.name,
       reason: "Gender requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // TAMIL NADU RESIDENT CHECK
@@ -43,36 +38,27 @@ const checkEligibility = async (schemeId, userData) => {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "Tamil Nadu residency requirement not satisfied.",
+      reason: "Tamil Nadu residency requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // MINIMUM AGE CHECK
   // =========================================================
 
-  if (
-    rules.minAge !== undefined &&
-    Number(userData.age) < rules.minAge
-  ) {
+  if (rules.minAge !== undefined && Number(userData.age) < rules.minAge) {
     return {
       eligible: false,
       scheme: scheme.name,
       reason: "Age requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // MAXIMUM AGE CHECK
   // =========================================================
 
-  if (
-    rules.maxAge !== undefined &&
-    Number(userData.age) > rules.maxAge
-  ) {
+  if (rules.maxAge !== undefined && Number(userData.age) > rules.maxAge) {
     return {
       eligible: false,
       scheme: scheme.name,
@@ -80,15 +66,11 @@ const checkEligibility = async (schemeId, userData) => {
     };
   }
 
-
   // =========================================================
   // COMMUNITY CHECK
   // =========================================================
 
-  if (
-    rules.community &&
-    !rules.community.includes(userData.community)
-  ) {
+  if (rules.community && !rules.community.includes(userData.community)) {
     return {
       eligible: false,
       scheme: scheme.name,
@@ -96,24 +78,20 @@ const checkEligibility = async (schemeId, userData) => {
     };
   }
 
-
   // =========================================================
   // ANNUAL FAMILY INCOME CHECK
   // =========================================================
 
   if (
     rules.maxAnnualIncome !== undefined &&
-    Number(userData.annualIncome) >
-      rules.maxAnnualIncome
+    Number(userData.annualIncome) > rules.maxAnnualIncome
   ) {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "Annual income exceeds the permitted limit.",
+      reason: "Annual income exceeds the permitted limit.",
     };
   }
-
 
   // =========================================================
   // FAMILY HEAD CHECK
@@ -126,45 +104,33 @@ const checkEligibility = async (schemeId, userData) => {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "Family head requirement not satisfied.",
+      reason: "Family head requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // SCHOOL TYPE CHECK
   // =========================================================
 
-  if (
-    rules.schoolType &&
-    !rules.schoolType.includes(userData.schoolType)
-  ) {
+  if (rules.schoolType && !rules.schoolType.includes(userData.schoolType)) {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "School type requirement not satisfied.",
+      reason: "School type requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // COURSE CHECK
   // =========================================================
 
-  if (
-    rules.course &&
-    !rules.course.includes(userData.course)
-  ) {
+  if (rules.course && !rules.course.includes(userData.course)) {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "Course requirement not satisfied.",
+      reason: "Course requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // INSTITUTION TYPE CHECK
@@ -172,35 +138,26 @@ const checkEligibility = async (schemeId, userData) => {
 
   if (
     rules.institutionType &&
-    !rules.institutionType.includes(
-      userData.institutionType
-    )
+    !rules.institutionType.includes(userData.institutionType)
   ) {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "Institution type requirement not satisfied.",
+      reason: "Institution type requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // BONAFIDE / ADMISSION PROOF CHECK
   // =========================================================
 
-  if (
-    rules.bonafide !== undefined &&
-    userData.bonafide !== rules.bonafide
-  ) {
+  if (rules.bonafide !== undefined && userData.bonafide !== rules.bonafide) {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "Admission/bonafide proof requirement not satisfied.",
+      reason: "Admission/bonafide proof requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // ELECTRICITY CONSUMPTION CHECK
@@ -208,34 +165,26 @@ const checkEligibility = async (schemeId, userData) => {
 
   if (
     rules.electricityConsumption !== undefined &&
-    userData.electricityConsumption !==
-      rules.electricityConsumption
+    userData.electricityConsumption !== rules.electricityConsumption
   ) {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "Electricity consumption requirement not satisfied.",
+      reason: "Electricity consumption requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // FULL-TIME STUDENT CHECK
   // =========================================================
 
-  if (
-    rules.fullTime !== undefined &&
-    userData.fullTime !== rules.fullTime
-  ) {
+  if (rules.fullTime !== undefined && userData.fullTime !== rules.fullTime) {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "Full-time student requirement not satisfied.",
+      reason: "Full-time student requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // CURRENT STUDENT STATUS CHECK
@@ -243,45 +192,33 @@ const checkEligibility = async (schemeId, userData) => {
 
   if (
     rules.studentStatus !== undefined &&
-    userData.studentStatus !==
-      rules.studentStatus
+    userData.studentStatus !== rules.studentStatus
   ) {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "Current student status requirement not satisfied.",
+      reason: "Current student status requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // OVERSEAS PROGRAMME CHECK
   // =========================================================
 
-  if (
-    rules.program &&
-    !rules.program.includes(userData.program)
-  ) {
+  if (rules.program && !rules.program.includes(userData.program)) {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "Programme requirement not satisfied.",
+      reason: "Programme requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // OVERSEAS PROGRAMME-SPECIFIC AGE CHECK
   // =========================================================
 
-  if (
-    rules.ageLimits &&
-    userData.program
-  ) {
-    const programRules =
-      rules.ageLimits[userData.program];
+  if (rules.ageLimits && userData.program) {
+    const programRules = rules.ageLimits[userData.program];
 
     if (
       programRules &&
@@ -292,46 +229,34 @@ const checkEligibility = async (schemeId, userData) => {
       return {
         eligible: false,
         scheme: scheme.name,
-        reason:
-          "Age requirement for the selected programme is not satisfied.",
+        reason: "Age requirement for the selected programme is not satisfied.",
       };
     }
   }
-
 
   // =========================================================
   // CONFIRMED ADMISSION CHECK
   // =========================================================
 
-  if (
-    rules.admission !== undefined &&
-    userData.admission !== rules.admission
-  ) {
+  if (rules.admission !== undefined && userData.admission !== rules.admission) {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "Confirmed admission requirement not satisfied.",
+      reason: "Confirmed admission requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // QS RANKING CHECK
   // =========================================================
 
-  if (
-    rules.qsRanking !== undefined &&
-    userData.qsRanking !== rules.qsRanking
-  ) {
+  if (rules.qsRanking !== undefined && userData.qsRanking !== rules.qsRanking) {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "QS ranking requirement not satisfied.",
+      reason: "QS ranking requirement not satisfied.",
     };
   }
-
 
   // =========================================================
   // FAMILY BENEFICIARY CHECK
@@ -339,34 +264,40 @@ const checkEligibility = async (schemeId, userData) => {
 
   if (
     rules.familyBeneficiary !== undefined &&
-    userData.familyBeneficiary !==
-      rules.familyBeneficiary
+    userData.familyBeneficiary !== rules.familyBeneficiary
   ) {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "Another family member has already received this benefit.",
+      reason: "Another family member has already received this benefit.",
     };
   }
-
 
   // =========================================================
   // PASSPORT CHECK
   // =========================================================
 
+  if (rules.passport !== undefined && userData.passport !== rules.passport) {
+    return {
+      eligible: false,
+      scheme: scheme.name,
+      reason: "Valid passport requirement not satisfied.",
+    };
+  }
+  // -------------------------
+  // Previous academic percentage check
+  // -------------------------
+
   if (
-    rules.passport !== undefined &&
-    userData.passport !== rules.passport
+    rules.minPercentage !== undefined &&
+    Number(userData.percentage) < rules.minPercentage
   ) {
     return {
       eligible: false,
       scheme: scheme.name,
-      reason:
-        "Valid passport requirement not satisfied.",
+      reason: "Previous academic percentage must be at least 50%.",
     };
   }
-
 
   // =========================================================
   // ELIGIBLE
@@ -375,11 +306,9 @@ const checkEligibility = async (schemeId, userData) => {
   return {
     eligible: true,
     scheme: scheme.name,
-    reason:
-      "You are eligible for this scheme.",
+    reason: "You are eligible for this scheme.",
   };
 };
-
 
 module.exports = {
   checkEligibility,

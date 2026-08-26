@@ -12,8 +12,7 @@ const schemes = [
 
     benefit: "₹1,000 per month",
 
-    department:
-      "Social Welfare and Women Empowerment Department",
+    department: "Social Welfare and Women Empowerment Department",
 
     status: "Active",
 
@@ -22,16 +21,9 @@ const schemes = [
 
       tnResident: "Yes",
 
-      schoolType: [
-        "Government",
-        "Government-Aided",
-      ],
+      schoolType: ["Government", "Government-Aided"],
 
-      course: [
-        "Undergraduate Degree",
-        "Diploma",
-        "ITI",
-      ],
+      course: ["Undergraduate Degree", "Diploma", "ITI"],
     },
 
     requiredDocuments: [
@@ -106,13 +98,7 @@ const schemes = [
     eligibility: {
       tnResident: "Yes",
 
-      community: [
-        "SC",
-        "ST",
-        "BC",
-        "MBC",
-        "DNC",
-      ],
+      community: ["SC", "ST", "BC", "MBC", "DNC"],
 
       course: [
         "Class XI",
@@ -127,12 +113,7 @@ const schemes = [
 
       bonafide: "Yes",
 
-      // CGPA is collected from the user.
-      // No minimum CGPA is enforced until
-      // an official confirmed requirement is defined.
-
-      // Annual income is collected from the user.
-      // Exact income limits vary by category.
+      minPercentage: 50,
     },
 
     requiredDocuments: [
@@ -166,10 +147,7 @@ const schemes = [
     eligibility: {
       tnResident: "Yes",
 
-      institutionType: [
-        "Government",
-        "Government-Aided",
-      ],
+      institutionType: ["Government", "Government-Aided"],
 
       course: [
         "Undergraduate Degree",
@@ -197,32 +175,21 @@ const schemes = [
   {
     id: "SCH005",
 
-    name:
-      "Annal Ambedkar Overseas Higher Education Scholarship",
+    name: "Annal Ambedkar Overseas Higher Education Scholarship",
 
     description:
       "Financial assistance for eligible students pursuing higher education abroad.",
 
-    benefit:
-      "Overseas education financial assistance",
+    benefit: "Overseas education financial assistance",
 
-    department:
-      "Adi Dravidar and Tribal Welfare Department",
+    department: "Adi Dravidar and Tribal Welfare Department",
 
     status: "Active",
 
     eligibility: {
-      community: [
-        "SC",
-        "SCC",
-        "ST",
-      ],
+      community: ["SC", "SCC", "ST"],
 
-      program: [
-        "Master's Degree",
-        "PhD",
-        "Post-Doctoral Research",
-      ],
+      program: ["Master's Degree", "PhD", "Post-Doctoral Research"],
 
       maxAnnualIncome: 1200000,
 
@@ -253,8 +220,7 @@ const schemes = [
         {
           maxAnnualIncome: 800000,
 
-          maximumScholarship:
-            "₹36 Lakhs per annum",
+          maximumScholarship: "₹36 Lakhs per annum",
         },
 
         {
@@ -262,8 +228,7 @@ const schemes = [
 
           maxAnnualIncome: 1200000,
 
-          maximumScholarship:
-            "₹24 Lakhs per annum",
+          maximumScholarship: "₹24 Lakhs per annum",
         },
       ],
     },
