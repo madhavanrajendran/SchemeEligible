@@ -32,7 +32,7 @@ function Eligibility() {
     try {
       // Send data to backend
       const response = await axios.post(
-        "http://localhost:5000/api/eligibility/check",
+        "https://scheme-eligible.vercel.app/api/eligibility/check",
         {
           schemeId: scheme.id,
           formData: formData,
