@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 
+# Python virtual environment
+venv/
+.venv/
+
 # Environment variables
 .env
 .env.local
@@ -9,6 +13,10 @@ node_modules/
 # Build output
 dist/
 build/
+
+# Python cache
+__pycache__/
+*.pyc
 
 # Logs
 *.log
