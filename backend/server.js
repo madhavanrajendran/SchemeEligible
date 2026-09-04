@@ -3,25 +3,50 @@ const cors = require("cors");
 require("dotenv").config();
 
 const eligibilityRoutes = require("./routes/eligibilityroutes");
+const schemesRoutes = require("./routes/schemesroutes");
+const schemeManagementRoutes = require("./routes/schememanageroutes");
+
 const db = require("./config/db");
 
 const app = express();
 
-// Middleware
+// =========================================================
+// MIDDLEWARE
+// =========================================================
+
 app.use(cors());
 app.use(express.json());
 
-// Routes
+
+// =========================================================
+// ROUTES
+// =========================================================
+
+// Eligibility checking
 app.use("/api/eligibility", eligibilityRoutes);
 
-// Test route
+// Public scheme routes
+app.use("/api/schemes", schemesRoutes);
+
+// Scheme management routes
+app.use("/api/scheme-management", schemeManagementRoutes);
+
+
+// =========================================================
+// TEST ROUTE
+// =========================================================
+
 app.get("/", (req, res) => {
   res.json({
     message: "Eligibility API is running",
   });
 });
 
-// Start server
+
+// =========================================================
+// START SERVER
+// =========================================================
+
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {

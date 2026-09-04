@@ -13,7 +13,7 @@ function SchemeGrid({ schemes, onSelect }) {
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {schemes.map((scheme) => (
         <SchemeCard
-          key={scheme.id}
+          key={scheme.scheme_id}
           scheme={scheme}
           onSelect={onSelect}
         />
@@ -23,3 +23,4 @@ function SchemeGrid({ schemes, onSelect }) {
 }
 
 export default SchemeGrid;
+
