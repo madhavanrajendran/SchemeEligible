@@ -2,6 +2,8 @@ import json
 import time
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
+from dotenv import load_dotenv
 
 from scrapper import (
     scrape_page,
@@ -18,12 +20,15 @@ from cache import has_content_changed, save_scheme_hash
 # CONFIGURATION
 # =========================================================
 
-BACKEND_URL = "http://localhost:5000"
+BACKEND_URL = os.getenv(
+    "BACKEND_URL",
+
+)
 MAX_GEMINI_REQUESTS = 20
 MAX_SCRAPE_WORKERS = 5
 
 # Keep disabled unless automatic database updates are intentionally required.
-AUTO_UPDATE = False
+AUTO_UPDATE = True
 
 
 # =========================================================

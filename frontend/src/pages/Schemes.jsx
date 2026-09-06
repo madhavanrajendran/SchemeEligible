@@ -20,7 +20,7 @@ function Schemes() {
         setError("");
 
         const response = await axios.get(
-          "http://localhost:5000/api/schemes"
+          `${import.meta.env.VITE_API_URL}/api/schemes`
         );
 
         setSchemes(response.data);

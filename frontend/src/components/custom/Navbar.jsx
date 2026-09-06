@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
-import about from "../../pages/About";
+
 
 function Navbar() {
   return (

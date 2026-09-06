@@ -21,7 +21,7 @@ function Eligibility() {
         setError("");
 
         const response = await axios.get(
-          `http://localhost:5000/api/schemes/${schemeId}`
+         `${import.meta.env.VITE_API_URL}/api/schemes/${schemeId}`
         );
 
         setScheme(response.data);
@@ -87,7 +87,7 @@ function Eligibility() {
   const handleSubmit = async (formData) => {
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/eligibility/check",
+       `${import.meta.env.VITE_API_URL}/api/eligibility/check`,
         {
           schemeId: scheme.scheme_id,
           formData,

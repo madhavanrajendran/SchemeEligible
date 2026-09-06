@@ -163,18 +163,18 @@ function Chatbot() {
       // ------------------------------------------------------
 
       const response =
-        await axios.post(
-          "http://localhost:5000/api/chat",
-          {
-            message: userMessage,
+  await axios.post(
+    `${import.meta.env.VITE_API_URL}/api/chat`,
+    {
+      message: userMessage,
 
-            profile:
-              updatedProfile,
+      profile:
+        updatedProfile,
 
-            isAnswering:
-              !!nextField,
-          }
-        );
+      isAnswering:
+        !!nextField,
+    }
+  );
 
       console.log(
         "Backend response:",
@@ -271,7 +271,7 @@ function Chatbot() {
 
         const response =
           await axios.post(
-            "http://localhost:5000/api/chat",
+           `${import.meta.env.VITE_API_URL}/api/chat`,
             {
               message: text,
 

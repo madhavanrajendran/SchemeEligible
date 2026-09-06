@@ -12,7 +12,6 @@ load_dotenv()
 
 BACKEND_URL = os.getenv(
     "BACKEND_URL",
-    "http://localhost:5000"
 ).rstrip("/")
 
 AI_UPDATE_TOKEN = os.getenv(
