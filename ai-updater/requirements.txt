@@ -1,0 +1,7 @@
+python-dotenv
+google-genai
+requests
+certifi
+urllib3
+beautifulsoup4
+resend
