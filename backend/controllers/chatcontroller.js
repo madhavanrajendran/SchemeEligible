@@ -1,97 +1,65 @@
 const db = require("../config/db");
 
 // ============================================================
-// HELPER FUNCTIONS
+// HELPERS
 // ============================================================
 
 const normalize = (value) => {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
+  if (value === null || value === undefined) return "";
   return String(value).trim().toLowerCase();
 };
 
-const hasValue = (profile, field) => {
-  return (
-    profile[field] !== undefined &&
-    profile[field] !== null &&
-    String(profile[field]).trim() !== ""
-  );
-};
+const hasValue = (profile, field) =>
+  profile[field] !== undefined &&
+  profile[field] !== null &&
+  String(profile[field]).trim() !== "";
 
-const isYes = (value) => {
-  const v = normalize(value);
+const isYes = (value) =>
+  ["yes", "y", "true", "1"].includes(normalize(value));
 
-  return (
-    v === "yes" ||
-    v === "y" ||
-    v === "true" ||
-    v === "1"
-  );
-};
+const isNo = (value) =>
+  ["no", "n", "false", "0"].includes(normalize(value));
 
-const isNo = (value) => {
-  const v = normalize(value);
-
-  return (
-    v === "no" ||
-    v === "n" ||
-    v === "false" ||
-    v === "0"
-  );
-};
+const splitList = (value) =>
+  normalize(value)
+    .split(/[,/|;]+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
 
 // ============================================================
 // QUESTIONS
 // ============================================================
 
 const QUESTIONS = {
-  age: {
-    label: "What is your age?",
-  },
-
+  age: { label: "What is your age?" },
   gender: {
     label: "What is your gender? (Male / Female / Other)",
   },
-
   tnResident: {
     label: "Are you a resident of Tamil Nadu? (Yes / No)",
   },
-
   community: {
     label:
       "What is your community? (SC / ST / SCC / BC / MBC / DNC / OC / Other)",
   },
-
-  annualIncome: {
-    label:
-      "What is your family's annual income? (Enter amount in ₹)",
+    annualIncome: {
+    label: "What is your family's annual income? (Enter amount in ₹)",
   },
-
   currentlyEnrolled: {
     label: "Are you currently a student? (Yes / No)",
   },
-
   educationLevel: {
     label:
       "What are you currently studying? (10th / 12th / UG / PG / Other)",
   },
-
   disability: {
-    label:
-      "Are you a person with a disability? (Yes / No)",
+    label: "Are you a person with a disability? (Yes / No)",
   },
-
   parentDisability: {
     label:
       "Is your parent or guardian a person with a disability? (Yes / No)",
   },
 };
-
-// ============================================================
-// QUESTION ORDER
-// ============================================================
 
 const BASIC_FIELDS = [
   "age",
@@ -106,12 +74,11 @@ const BASIC_FIELDS = [
 ];
 
 // ============================================================
-// GET NEXT QUESTION
+// NEXT QUESTION
 // ============================================================
 
 const getNextQuestion = (profile) => {
   for (const field of BASIC_FIELDS) {
-    // Education level is required only for students
     if (
       field === "educationLevel" &&
       isNo(profile.currentlyEnrolled)
@@ -119,9 +86,7 @@ const getNextQuestion = (profile) => {
       continue;
     }
 
-    if (!hasValue(profile, field)) {
-      return field;
-    }
+    if (!hasValue(profile, field)) return field;
   }
 
   return null;
@@ -133,24 +98,12 @@ const getNextQuestion = (profile) => {
 
 const convertAnswer = (field, value) => {
   const answer = String(value).trim();
-
-  // ==========================================================
-  // AGE
-  // ==========================================================
+  const lower = normalize(answer);
 
   if (field === "age") {
     const match = answer.match(/\d+/);
-
-    if (match) {
-      return parseInt(match[0], 10);
-    }
-
-    return answer;
+    return match ? parseInt(match[0], 10) : answer;
   }
-
-  // ==========================================================
-  // INCOME
-  // ==========================================================
 
   if (field === "annualIncome") {
     const cleaned = answer
@@ -160,21 +113,14 @@ const convertAnswer = (field, value) => {
       .replace(/\binr\b/gi, "")
       .trim();
 
-    const match = cleaned.match(
-      /\d+(?:\.\d+)?/
-    );
+    const match = cleaned.match(/\d+(?:\.\d+)?/);
 
     if (match) {
       let income = parseFloat(match[0]);
 
-      const lower = cleaned.toLowerCase();
-
-      if (
-        lower.includes("lakh") ||
-        lower.includes("lakhs")
-      ) {
+      if (/\b(lakh|lakhs|l)\b/i.test(cleaned)) {
         income *= 100000;
-      } else if (/\bk\b/.test(lower)) {
+      } else if (/\bk\b/i.test(cleaned)) {
         income *= 1000;
       }
 
@@ -184,82 +130,64 @@ const convertAnswer = (field, value) => {
     return answer;
   }
 
-  // ==========================================================
-  // EDUCATION LEVEL
-  // ==========================================================
+  if (field === "gender") {
+    if (/\b(female|woman|women|girl)\b/i.test(answer))
+      return "Female";
+    if (/\b(male|man|men|boy)\b/i.test(answer))
+      return "Male";
+    return "Other";
+  }
+
+  if (field === "community") {
+    const communities = ["SCC", "SC", "ST", "MBC", "BC", "DNC", "OC"];
+    const found = communities.find((c) =>
+      new RegExp(`\\b${c}\\b`, "i").test(answer)
+    );
+    return found ? found : "Other";
+  }
 
   if (field === "educationLevel") {
-    const lower = normalize(answer);
-
-    // 10th
     if (
-      lower.includes("10th") ||
-      lower.includes("class 10") ||
-      lower.includes("class x") ||
-      lower === "x" ||
-      lower.includes("tenth") ||
-      lower.includes("10 std") ||
-      lower.includes("10th standard")
-    ) {
+      /\b(10th|class 10|class x|tenth|10 std|10th standard)\b/i.test(
+        answer
+      )
+    )
       return "10th";
-    }
 
-    // 12th
     if (
-      lower.includes("12th") ||
-      lower.includes("class 12") ||
-      lower.includes("class xii") ||
-      lower === "xii" ||
-      lower.includes("twelfth") ||
-      lower.includes("12 std") ||
-      lower.includes("12th standard")
-    ) {
+      /\b(12th|class 12|class xii|twelfth|12 std|12th standard)\b/i.test(
+        answer
+      )
+    )
       return "12th";
-    }
 
-    // UG
     if (
-      lower === "ug" ||
-      lower.includes("undergraduate") ||
-      lower.includes("bachelor") ||
-      lower.includes("bachelors") ||
-      lower.includes("degree") ||
-      lower.includes("college")
-    ) {
-      return "UG";
-    }
-
-    // PG
-    if (
-      lower === "pg" ||
-      lower.includes("postgraduate") ||
-      lower.includes("post graduate") ||
-      lower.includes("master") ||
-      lower.includes("masters")
-    ) {
+      /\b(pg|postgraduate|post graduate|master|masters)\b/i.test(
+        answer
+      )
+    )
       return "PG";
-    }
+
+    if (
+      /\b(ug|undergraduate|bachelor|bachelors|degree|college|engineering)\b/i.test(
+        answer
+      )
+    )
+      return "UG";
 
     return "Other";
   }
 
-  // ==========================================================
-  // YES / NO
-  // ==========================================================
-
   if (
-    field === "tnResident" ||
-    field === "currentlyEnrolled" ||
-    field === "disability" ||
-    field === "parentDisability"
+    [
+      "tnResident",
+      "currentlyEnrolled",
+      "disability",
+      "parentDisability",
+    ].includes(field)
   ) {
-    if (isYes(answer)) {
-      return "yes";
-    }
-
-    if (isNo(answer)) {
-      return "no";
-    }
+    if (isYes(answer)) return "yes";
+    if (isNo(answer)) return "no";
   }
 
   return answer;
@@ -274,17 +202,10 @@ const extractProfileFromMessage = (
   existingProfile = {}
 ) => {
   const text = normalize(message);
-
-  const extracted = {
-    ...existingProfile,
-  };
-
-  // ==========================================================
-  // AGE
-  // ==========================================================
-
+  const extracted = { ...existingProfile };
+// AGE
   let ageMatch = text.match(
-    /\b(?:i am|i'm|im|age|aged)\s*(?:about\s*)?(\d{1,3})\s*(?:years?|yrs?)?\b/
+    /\b(?:i am|i'm|im|age|aged)\s*(?:about\s*)?(\d{1,3})(?:\s*(?:years?|yrs?))?\b/
   );
 
   if (!ageMatch) {
@@ -301,88 +222,58 @@ const extractProfileFromMessage = (
 
   if (ageMatch) {
     const age = parseInt(ageMatch[1], 10);
-
-    if (age >= 1 && age <= 120) {
-      extracted.age = age;
-    }
+    if (age >= 1 && age <= 120) extracted.age = age;
   }
-
-  // ==========================================================
   // GENDER
-  // ==========================================================
-
-  if (
-    /\b(female|woman|women|girl)\b/.test(text)
-  ) {
+  if (/\b(female|woman|women|girl)\b/i.test(text)) {
     extracted.gender = "Female";
-  } else if (
-    /\b(male|man|men|boy)\b/.test(text)
-  ) {
+  } else if (/\b(male|man|men|boy)\b/i.test(text)) {
     extracted.gender = "Male";
-  } else if (
-    /\b(other|non[- ]?binary)\b/.test(text)
-  ) {
+  } else if (/\b(other|non[- ]?binary)\b/i.test(text)) {
     extracted.gender = "Other";
   }
-
-  // ==========================================================
-  // TAMIL NADU
-  // ==========================================================
-
+// TAMIL NADU
   if (
-    /\b(resident of tamil nadu|from tamil nadu|live in tamil nadu|living in tamil nadu|tn resident|tamil nadu resident)\b/.test(
+    /\b(not a resident of tamil nadu|not from tamil nadu|outside tamil nadu|not a tamil nadu resident)\b/i.test(
+      text
+    )
+  ) {
+    extracted.tnResident = "no";
+  } else if (
+    /\b(resident of tamil nadu|from tamil nadu|live in tamil nadu|living in tamil nadu|tn resident|tamil nadu resident)\b/i.test(
       text
     )
   ) {
     extracted.tnResident = "yes";
   }
 
-  if (
-    /\b(not a resident of tamil nadu|not from tamil nadu|outside tamil nadu|not a tamil nadu resident)\b/.test(
-      text
-    )
-  ) {
-    extracted.tnResident = "no";
-  }
-
-  // ==========================================================
   // COMMUNITY
-  // ==========================================================
-
   const communities = [
-    "scc",
-    "sc",
-    "st",
-    "bc",
-    "mbc",
-    "dnc",
-    "oc",
+    "SCC",
+    "SC",
+    "ST",
+    "MBC",
+    "BC",
+    "DNC",
+    "OC",
   ];
 
   for (const community of communities) {
-    const pattern = new RegExp(
-      `\\b${community}\\b`
-    );
-
-    if (pattern.test(text)) {
-      extracted.community =
-        community.toUpperCase();
-
+    if (
+      new RegExp(`\\b${community}\\b`, "i").test(text)
+    ) {
+      extracted.community = community;
       break;
     }
   }
-
-  // ==========================================================
-  // INCOME
-  // ==========================================================
-
+ // INCOME
   let incomeMatch = text.match(
-    /(?:family income|annual income|income)\s*(?:is|of|:)?\s*₹?\s*([\d,]+(?:\.\d+)?)\s*(lakh|lakhs|l|k)?\b/
+    /\b(?:family\s+income|annual\s+income|income)\s*(?:is|of|:)?\s*₹?\s*([\d,]+(?:\.\d+)?)\s*(lakh|lakhs|l|k)?\b/i
   );
 
   if (!incomeMatch) {
     incomeMatch = text.match(
-      /₹?\s*([\d,]+(?:\.\d+)?)\s*(lakh|lakhs|l|k)\b/
+      /₹?\s*([\d,]+(?:\.\d+)?)\s*(lakh|lakhs|l|k)\b/i
     );
   }
 
@@ -391,15 +282,9 @@ const extractProfileFromMessage = (
       incomeMatch[1].replace(/,/g, "")
     );
 
-    const unit = normalize(
-      incomeMatch[2]
-    );
+    const unit = normalize(incomeMatch[2]);
 
-    if (
-      unit === "lakh" ||
-      unit === "lakhs" ||
-      unit === "l"
-    ) {
+    if (["lakh", "lakhs", "l"].includes(unit)) {
       income *= 100000;
     } else if (unit === "k") {
       income *= 1000;
@@ -407,101 +292,81 @@ const extractProfileFromMessage = (
 
     extracted.annualIncome = income;
   }
-
-  // ==========================================================
-  // STUDENT
-  // ==========================================================
-
+ // STUDENT
   if (
-    /\b(student|studying|currently studying|college student|school student|undergraduate|postgraduate)\b/.test(
+    /\b(not a student|not studying|finished studying|currently not studying|no longer studying)\b/i.test(
+      text
+    )
+  ) {
+    extracted.currentlyEnrolled = "no";
+  } else if (
+    /\b(student|studying|currently studying|college student|school student|undergraduate|postgraduate)\b/i.test(
       text
     )
   ) {
     extracted.currentlyEnrolled = "yes";
   }
 
-  if (
-    /\b(not a student|not studying|finished studying|currently not studying|no longer studying)\b/.test(
-      text
-    )
-  ) {
-    extracted.currentlyEnrolled = "no";
-  }
-
-  // ==========================================================
   // EDUCATION LEVEL
-  // ==========================================================
-
   if (
-    /\b(10th|class 10|class x|tenth|10 std|10th standard)\b/.test(
+    /\b(10th|class 10|class x|tenth|10 std|10th standard)\b/i.test(
       text
     )
   ) {
     extracted.educationLevel = "10th";
     extracted.currentlyEnrolled = "yes";
   } else if (
-    /\b(12th|class 12|class xii|twelfth|12 std|12th standard)\b/.test(
+    /\b(12th|class 12|class xii|twelfth|12 std|12th standard)\b/i.test(
       text
     )
   ) {
     extracted.educationLevel = "12th";
     extracted.currentlyEnrolled = "yes";
   } else if (
-    /\b(ug|undergraduate|bachelor|bachelors|degree)\b/.test(
-      text
-    )
-  ) {
-    extracted.educationLevel = "UG";
-    extracted.currentlyEnrolled = "yes";
-  } else if (
-    /\b(pg|postgraduate|post graduate|master|masters)\b/.test(
+    /\b(pg|postgraduate|post graduate|master|masters)\b/i.test(
       text
     )
   ) {
     extracted.educationLevel = "PG";
     extracted.currentlyEnrolled = "yes";
+  } else if (
+    /\b(ug|undergraduate|bachelor|bachelors|degree|college|engineering)\b/i.test(
+      text
+    )
+  ) {
+    extracted.educationLevel = "UG";
+    extracted.currentlyEnrolled = "yes";
   }
 
-  // ==========================================================
   // USER DISABILITY
-  // ==========================================================
-
   if (
-    /\b(i have a disability|i am disabled|i'm disabled|person with a disability|i have disability|i am a person with disability)\b/.test(
+    /\b(i do not have a disability|i don't have a disability|not disabled|no disability|i have no disability)\b/i.test(
+      text
+    )
+  ) {
+    extracted.disability = "no";
+  } else if (
+    /\b(i have a disability|i am disabled|i'm disabled|person with a disability|i have disability|i am a person with disability)\b/i.test(
       text
     )
   ) {
     extracted.disability = "yes";
   }
 
-  if (
-    /\b(i do not have a disability|i don't have a disability|not disabled|no disability|i have no disability)\b/.test(
-      text
-    )
-  ) {
-    extracted.disability = "no";
-  }
-
-  // ==========================================================
   // PARENT DISABILITY
-  // ==========================================================
-
   const parentMentioned =
-    /\b(parent|mother|father|guardian|parents)\b/.test(
+    /\b(parent|parents|mother|father|guardian)\b/i.test(
       text
     );
 
   const disabilityMentioned =
-    /\b(disabled|disability|differently abled|differently-abled)\b/.test(
+    /\b(disabled|disability|differently abled|differently-abled)\b/i.test(
       text
     );
 
-  if (
-    parentMentioned &&
-    disabilityMentioned
-  ) {
+  if (parentMentioned && disabilityMentioned) {
     if (
-      /\b(no|not|doesn't|does not|don't|do not|none|neither)\b/.test(
+      /\b(no|not|doesn't|does not|don't|do not|none|neither)\b/i.test(
         text
       )
     ) {
@@ -509,6 +374,14 @@ const extractProfileFromMessage = (
     } else {
       extracted.parentDisability = "yes";
     }
+  }
+
+  if (
+    /\b(neither parent|neither of my parents|parents are not disabled|parent is not disabled)\b/i.test(
+      text
+    )
+  ) {
+    extracted.parentDisability = "no";
   }
 
   return extracted;
@@ -522,83 +395,49 @@ const educationMatches = (
   scheme,
   educationLevel
 ) => {
-  if (
-    !educationLevel ||
-    educationLevel === "Other"
-  ) {
+  if (!educationLevel || educationLevel === "Other") {
     return true;
   }
 
-  const classLevel = normalize(
-    scheme.class_level
-  );
+  const classLevel = normalize(scheme.class_level);
+  const course = normalize(scheme.course);
+  const program = normalize(scheme.program);
 
-  const course = normalize(
-    scheme.course
-  );
-
-  const program = normalize(
-    scheme.program
-  );
-
-  const educationText =
-    `${classLevel} ${course} ${program}`;
-
-  // ==========================================================
-  // 10TH
-  // ==========================================================
+  const text = `${classLevel} ${course} ${program}`;
 
   if (educationLevel === "10th") {
     return (
-      /\b10\b/.test(educationText) ||
-      /\b10th\b/.test(educationText) ||
-      /\bclass\s*x\b/.test(educationText) ||
-      /\bix\b/.test(educationText) ||
-      /\bix\/x\b/.test(educationText) ||
-      /\bpre[- ]?matric\b/.test(educationText)
+      /\b(10|10th|class x|ix|ix\/x)\b/i.test(text) ||
+      /\bpre[- ]?matric\b/i.test(text) ||
+      /\bschool\b/i.test(text)
     );
   }
-
-  // ==========================================================
-  // 12TH
-  // ==========================================================
 
   if (educationLevel === "12th") {
     return (
-      /\b12\b/.test(educationText) ||
-      /\b12th\b/.test(educationText) ||
-      /\bclass\s*xii\b/.test(educationText) ||
-      /\bxii\b/.test(educationText) ||
-      /\bxi\/xii\b/.test(educationText) ||
-      /\b11th\b/.test(educationText) ||
-      /\bpost[- ]?matric\b/.test(educationText)
+      /\b(12|12th|class xii|xi\/xii|11th|xii)\b/i.test(
+        text
+      ) ||
+      /\bschool\b/i.test(text)
     );
   }
-
-  // ==========================================================
-  // UG
-  // ==========================================================
 
   if (educationLevel === "UG") {
     return (
-      /\bug\b/.test(educationText) ||
-      /\bundergraduate\b/.test(educationText) ||
-      /\bbachelor/.test(educationText) ||
-      /\bdegree\b/.test(educationText) ||
-      /\bcollege\b/.test(educationText)
+      /\bug\b/i.test(text) ||
+      /\bundergraduate\b/i.test(text) ||
+      /\bbachelor\b/i.test(text) ||
+      /\bdegree\b/i.test(text) ||
+      /\bcollege\b/i.test(text)
     );
   }
 
-  // ==========================================================
-  // PG
-  // ==========================================================
-
   if (educationLevel === "PG") {
     return (
-      /\bpg\b/.test(educationText) ||
-      /\bpostgraduate\b/.test(educationText) ||
-      /\bpost graduate\b/.test(educationText) ||
-      /\bmaster/.test(educationText)
+      /\bpg\b/i.test(text) ||
+      /\bpostgraduate\b/i.test(text) ||
+      /\bpost graduate\b/i.test(text) ||
+      /\bmaster\b/i.test(text)
     );
   }
 
@@ -606,40 +445,25 @@ const educationMatches = (
 };
 
 // ============================================================
-// PARENT DISABILITY SCHEME DETECTION
+// PARENT DISABILITY SCHEME
 // ============================================================
 
-const isParentDisabilityScheme = (
-  scheme
-) => {
-  const schemeText = normalize(
-    `${scheme.name || ""} ${
-      scheme.description || ""
-    } ${scheme.benefit || ""}`
+const isParentDisabilityScheme = (scheme) => {
+  const text = normalize(
+    `${scheme.name || ""} ${scheme.description || ""} ${
+      scheme.benefit || ""
+    }`
   );
 
   return (
-    schemeText.includes(
-      "sons/daughters of differently abled"
-    ) ||
-    schemeText.includes(
-      "sons and daughters of differently abled"
-    ) ||
-    schemeText.includes(
-      "children of differently abled"
-    ) ||
-    schemeText.includes(
-      "children of disabled persons"
-    ) ||
-    schemeText.includes(
-      "children of differently abled persons"
-    ) ||
-    schemeText.includes(
-      "child of differently abled"
-    ) ||
-    schemeText.includes(
-      "children of disabled"
-    )
+    Boolean(Number(scheme.parent_disability_required)) ||
+    text.includes("sons/daughters of differently abled") ||
+    text.includes("sons and daughters of differently abled") ||
+    text.includes("children of differently abled") ||
+    text.includes("children of disabled persons") ||
+    text.includes("children of differently abled persons") ||
+    text.includes("child of differently abled") ||
+    text.includes("children of disabled")
   );
 };
 
@@ -652,49 +476,32 @@ const filterPossibleSchemes = (
   profile
 ) => {
   return schemes.filter((scheme) => {
-
-    // ========================================================
     // AGE
-    // ========================================================
-
     if (hasValue(profile, "age")) {
       const age = Number(profile.age);
 
-      if (isNaN(age)) {
-        return false;
-      }
+      if (isNaN(age)) return false;
 
       if (
         scheme.min_age !== null &&
         age < Number(scheme.min_age)
-      ) {
+      )
         return false;
-      }
 
       if (
         scheme.max_age !== null &&
         age > Number(scheme.max_age)
-      ) {
+      )
         return false;
-      }
     }
 
-    // ========================================================
     // GENDER
-    // ========================================================
-
     if (
       hasValue(profile, "gender") &&
       scheme.gender
     ) {
-      const userGender =
-        normalize(profile.gender);
-
-      const allowed =
-        normalize(scheme.gender)
-          .split(",")
-          .map((x) => x.trim())
-          .filter(Boolean);
+      const userGender = normalize(profile.gender);
+      const allowed = splitList(scheme.gender);
 
       const matches = allowed.some(
         (gender) =>
@@ -703,26 +510,19 @@ const filterPossibleSchemes = (
           gender === userGender
       );
 
-      if (
-        allowed.length > 0 &&
-        !matches
-      ) {
+      if (allowed.length > 0 && !matches) {
         return false;
       }
     }
 
-    // ========================================================
     // TN RESIDENT
-    // ========================================================
-
     if (
       hasValue(profile, "tnResident") &&
       scheme.tn_resident !== null
     ) {
-      const required =
-        Boolean(
-          Number(scheme.tn_resident)
-        );
+      const required = Boolean(
+        Number(scheme.tn_resident)
+      );
 
       if (
         required &&
@@ -732,10 +532,7 @@ const filterPossibleSchemes = (
       }
     }
 
-    // ========================================================
     // COMMUNITY
-    // ========================================================
-
     if (
       hasValue(profile, "community") &&
       scheme.community
@@ -743,43 +540,36 @@ const filterPossibleSchemes = (
       const userCommunity =
         normalize(profile.community);
 
-      const allowed =
-        normalize(scheme.community)
-          .split(",")
-          .map((x) => x.trim())
-          .filter(Boolean);
+      const allowed = splitList(
+        scheme.community
+      );
 
       const matches = allowed.some(
         (community) =>
-          community === userCommunity ||
-          community.includes(userCommunity) ||
-          userCommunity.includes(community)
+          community === userCommunity
       );
 
-      if (
-        allowed.length > 0 &&
-        !matches
-      ) {
+      if (allowed.length > 0 && !matches) {
         return false;
       }
     }
 
-    // ========================================================
     // INCOME
-    // ========================================================
-
     if (
       hasValue(profile, "annualIncome") &&
       scheme.max_annual_income !== null
     ) {
-      const income =
-        Number(profile.annualIncome);
+      const income = Number(
+        profile.annualIncome
+      );
 
-      const maximum =
-        Number(scheme.max_annual_income);
+      const maximum = Number(
+        scheme.max_annual_income
+      );
+
+      if (isNaN(income)) return false;
 
       if (
-        !isNaN(income) &&
         !isNaN(maximum) &&
         income > maximum
       ) {
@@ -787,10 +577,7 @@ const filterPossibleSchemes = (
       }
     }
 
-    // ========================================================
     // STUDENT
-    // ========================================================
-
     if (
       hasValue(
         profile,
@@ -798,75 +585,54 @@ const filterPossibleSchemes = (
       ) &&
       scheme.currently_enrolled !== null
     ) {
-      const required =
-        Boolean(
-          Number(
-            scheme.currently_enrolled
-          )
-        );
+      const required = Boolean(
+        Number(scheme.currently_enrolled)
+      );
 
       if (
         required &&
-        isNo(
-          profile.currentlyEnrolled
-        )
+        isNo(profile.currentlyEnrolled)
       ) {
         return false;
       }
 
-      // If scheme explicitly requires non-student
       if (
         !required &&
-        isYes(
-          profile.currentlyEnrolled
-        )
+        isYes(profile.currentlyEnrolled)
       ) {
         return false;
       }
     }
 
-    // ========================================================
-    // EDUCATION LEVEL
-    // ========================================================
-
+    // EDUCATION
     if (
       isYes(profile.currentlyEnrolled) &&
-      hasValue(
-        profile,
-        "educationLevel"
-      )
+      hasValue(profile, "educationLevel")
     ) {
       const hasEducationData =
         scheme.class_level ||
         scheme.course ||
         scheme.program;
 
-      if (hasEducationData) {
-        if (
-          !educationMatches(
-            scheme,
-            profile.educationLevel
-          )
-        ) {
-          return false;
-        }
+      if (
+        hasEducationData &&
+        !educationMatches(
+          scheme,
+          profile.educationLevel
+        )
+      ) {
+        return false;
       }
     }
 
-    // ========================================================
     // USER DISABILITY
-    // ========================================================
-
     if (
       hasValue(profile, "disability") &&
       scheme.disability_required !== null
     ) {
-      const required =
-        Boolean(
-          Number(
-            scheme.disability_required
-          )
-        );
+      const required = Boolean(
+        Number(scheme.disability_required)
+      );
 
       if (
         required &&
@@ -874,21 +640,9 @@ const filterPossibleSchemes = (
       ) {
         return false;
       }
-
-      if (
-        !required &&
-        isYes(profile.disability)
-      ) {
-        // Do not automatically reject.
-        // Some schemes do not require disability
-        // but can still be available to disabled students.
-      }
     }
 
-    // ========================================================
     // PARENT DISABILITY
-    // ========================================================
-
     if (
       hasValue(
         profile,
@@ -896,27 +650,21 @@ const filterPossibleSchemes = (
       ) &&
       scheme.parent_disability_required !== null
     ) {
-      const required =
-        Boolean(
-          Number(
-            scheme.parent_disability_required
-          )
-        );
+      const required = Boolean(
+        Number(
+          scheme.parent_disability_required
+        )
+      );
 
       if (
         required &&
-        isNo(
-          profile.parentDisability
-        )
+        isNo(profile.parentDisability)
       ) {
         return false;
       }
     }
 
-    // ========================================================
-    // EXTRA PARENT DISABILITY SAFETY
-    // ========================================================
-
+    // EXTRA SAFETY CHECK
     if (
       isParentDisabilityScheme(scheme) &&
       isNo(profile.parentDisability)
@@ -929,7 +677,7 @@ const filterPossibleSchemes = (
 };
 
 // ============================================================
-// CALCULATE MATCH SCORE
+// MATCH SCORE
 // ============================================================
 
 const calculateMatchScore = (
@@ -939,10 +687,7 @@ const calculateMatchScore = (
   let applicable = 0;
   let matched = 0;
 
-  // ==========================================================
   // AGE
-  // ==========================================================
-
   if (
     hasValue(profile, "age") &&
     (
@@ -962,29 +707,18 @@ const calculateMatchScore = (
       scheme.max_age === null ||
       age <= Number(scheme.max_age);
 
-    if (minOK && maxOK) {
-      matched++;
-    }
+    if (minOK && maxOK) matched++;
   }
 
-  // ==========================================================
   // GENDER
-  // ==========================================================
-
   if (
     hasValue(profile, "gender") &&
     scheme.gender
   ) {
     applicable++;
 
-    const gender =
-      normalize(profile.gender);
-
-    const allowed =
-      normalize(scheme.gender)
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean);
+    const gender = normalize(profile.gender);
+    const allowed = splitList(scheme.gender);
 
     if (
       allowed.some(
@@ -998,46 +732,28 @@ const calculateMatchScore = (
     }
   }
 
-  // ==========================================================
   // TN RESIDENT
-  // ==========================================================
-
   if (
-    hasValue(
-      profile,
-      "tnResident"
-    ) &&
+    hasValue(profile, "tnResident") &&
     scheme.tn_resident !== null
   ) {
     applicable++;
 
-    const required =
-      Boolean(
-        Number(
-          scheme.tn_resident
-        )
-      );
+    const required = Boolean(
+      Number(scheme.tn_resident)
+    );
 
     if (
       !required ||
-      (
-        required &&
-        isYes(profile.tnResident)
-      )
+      isYes(profile.tnResident)
     ) {
       matched++;
     }
   }
 
-  // ==========================================================
   // COMMUNITY
-  // ==========================================================
-
   if (
-    hasValue(
-      profile,
-      "community"
-    ) &&
+    hasValue(profile, "community") &&
     scheme.community
   ) {
     applicable++;
@@ -1045,48 +761,40 @@ const calculateMatchScore = (
     const userCommunity =
       normalize(profile.community);
 
-    const allowed =
-      normalize(scheme.community)
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean);
+    const allowed = splitList(
+      scheme.community
+    );
 
     if (
       allowed.some(
-        (x) =>
-          x === userCommunity ||
-          x.includes(userCommunity) ||
-          userCommunity.includes(x)
-      )) 
-      {
-      matched++;
-    }
-  }
-
-  // ==========================================================
-  // INCOME
-  // ==========================================================
-
-  if (
-    hasValue(
-      profile,
-      "annualIncome"
-    ) &&
-    scheme.max_annual_income !== null) {
-    applicable++;
-
-    if (
-      Number(profile.annualIncome) <=
-      Number(scheme.max_annual_income)
+        (x) => x === userCommunity
+      )
     ) {
       matched++;
     }
   }
 
-  // ==========================================================
-  // STUDENT
-  // ==========================================================
+  // INCOME
+  if (
+    hasValue(profile, "annualIncome") &&
+    scheme.max_annual_income !== null
+  ) {
+    applicable++;
 
+    const income = Number(
+      profile.annualIncome
+    );
+
+    if (
+      !isNaN(income) &&
+      income <=
+        Number(scheme.max_annual_income)
+    ) {
+      matched++;
+    }
+  }
+
+  // STUDENT
   if (
     hasValue(
       profile,
@@ -1096,39 +804,24 @@ const calculateMatchScore = (
   ) {
     applicable++;
 
-    const required =
-      Boolean(
-        Number(
-          scheme.currently_enrolled
-        )
-      );
+    const required = Boolean(
+      Number(scheme.currently_enrolled)
+    );
 
     if (
-      (
-        required &&
-        isYes(profile.currentlyEnrolled)
-      ) ||
-      (
-        !required &&
-        isNo(profile.currentlyEnrolled)
-      )
+      (required &&
+        isYes(profile.currentlyEnrolled)) ||
+      (!required &&
+        isNo(profile.currentlyEnrolled))
     ) {
       matched++;
     }
   }
 
-  // ==========================================================
-  // EDUCATION LEVEL
-  // ==========================================================
-
+  // EDUCATION
   if (
-    isYes(
-      profile.currentlyEnrolled
-    ) &&
-    hasValue(
-      profile,
-      "educationLevel"
-    )
+    isYes(profile.currentlyEnrolled) &&
+    hasValue(profile, "educationLevel")
   ) {
     const hasEducationData =
       scheme.class_level ||
@@ -1149,43 +842,28 @@ const calculateMatchScore = (
     }
   }
 
-  // ==========================================================
   // USER DISABILITY
-  // ==========================================================
-
   if (
-    hasValue(
-      profile,
-      "disability"
-    ) &&
-    scheme.disability_required !== null) {
+    hasValue(profile, "disability") &&
+    scheme.disability_required !== null
+  ) {
     applicable++;
 
-    const required =
-      Boolean(
-        Number(
-          scheme.disability_required
-        )
-      );
+    const required = Boolean(
+      Number(scheme.disability_required)
+    );
 
     if (
-      (
-        required &&
-        isYes(profile.disability)
-      ) ||
-      (
-        !required &&
-        isNo(profile.disability)
-      )
+      (required &&
+        isYes(profile.disability)) ||
+      (!required &&
+        isNo(profile.disability))
     ) {
       matched++;
     }
   }
 
-  // ==========================================================
   // PARENT DISABILITY
-  // ==========================================================
-
   if (
     hasValue(
       profile,
@@ -1195,35 +873,23 @@ const calculateMatchScore = (
   ) {
     applicable++;
 
-    const required =
-      Boolean(
-        Number(
-          scheme.parent_disability_required
-        )
-      );
+    const required = Boolean(
+      Number(
+        scheme.parent_disability_required
+      )
+    );
 
     if (
-      (
-        required &&
-        isYes(
-          profile.parentDisability
-        )
-      ) ||
-      (
-        !required &&
-        isNo(
-          profile.parentDisability
-        )
-      )
+      (required &&
+        isYes(profile.parentDisability)) ||
+      (!required &&
+        isNo(profile.parentDisability))
     ) {
       matched++;
     }
   }
 
-  // ==========================================================
-  // PARENT DISABILITY SAFETY
-  // ==========================================================
-
+  // EXTRA PARENT SAFETY
   if (
     isParentDisabilityScheme(scheme) &&
     hasValue(
@@ -1234,21 +900,13 @@ const calculateMatchScore = (
     applicable++;
 
     if (
-      isYes(
-        profile.parentDisability
-      )
+      isYes(profile.parentDisability)
     ) {
       matched++;
     }
   }
 
-  // ==========================================================
-  // SCORE
-  // ==========================================================
-
-  if (applicable === 0) {
-    return 50;
-  }
+  if (applicable === 0) return 50;
 
   return Math.round(
     (matched / applicable) * 100
@@ -1262,50 +920,38 @@ const calculateMatchScore = (
 const formatScheme = (
   scheme,
   profile = {}
-) => {
-  return {
-    schemeId: scheme.scheme_id,
-
-    name: scheme.name,
-
-    description:
-      scheme.description ||
-      "Description not available.",
-
-    benefit:
-      scheme.benefit ||
-      "Benefit information not available.",
-
-    matchScore:
-      calculateMatchScore(
-        scheme,
-        profile
-      ),
-
-    sourceUrl:
-      scheme.source_url ||
-      null,
-
-    applicationUrl:
-      scheme.application_url ||
-      null,
-  };
-};
+) => ({
+  schemeId: scheme.scheme_id,
+  name: scheme.name,
+  description:
+    scheme.description ||
+    "Description not available.",
+  benefit:
+    scheme.benefit ||
+    "Benefit information not available.",
+  matchScore:
+    calculateMatchScore(
+      scheme,
+      profile
+    ),
+  sourceUrl:
+    scheme.source_url || null,
+  applicationUrl:
+    scheme.application_url || null,
+});
 
 // ============================================================
-// BUILD POSSIBLE SCHEMES REPLY
+// POSSIBLE SCHEMES RESPONSE
 // ============================================================
 
 const buildPossibleSchemesReply = (
   possibleSchemes,
   profile
 ) => {
-  if (
-    possibleSchemes.length === 0
-  ) {
+  if (!possibleSchemes.length) {
     return (
-      "Based on the information you provided, I couldn't find any obvious matching schemes.\n\n" +
-      "You can try checking the available government schemes or complete a detailed eligibility check."
+      "I couldn't find any obvious matching schemes.\n\n" +
+      "You can try checking other government schemes or complete a detailed eligibility check."
     );
   }
 
@@ -1319,55 +965,63 @@ const buildPossibleSchemesReply = (
             profile
           ),
       }))
-      .sort(
-        (a, b) =>
-          b.score - a.score
-      );
-
-  const topSchemes =
-    scoredSchemes.slice(0, 5);
-
-  const list =
-    topSchemes
-      .map(
-        (item, index) => {
-          const scheme =
-            item.scheme;
-
-          let text =
-            `${index + 1}. ${scheme.name}`;
-
-          text +=
-            `\n   Match Score: ${item.score}%`;
-
-          text +=
-            `\n   Description: ${
-              scheme.description ||
-              "Description not available."
-            }`;
-
-          text +=
-            `\n   Benefit: ${
-              scheme.benefit ||
-              "Benefit information not available."
-            }`;
-
-          return text;
+      .sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
         }
-      )
-      .join("\n\n");
 
-  return (
-    "Based on the information you provided, these schemes are your strongest preliminary matches:\n\n" +
-    list +
-    "\n\n" +
-    "The Match Score shows how closely your provided information matches the available scheme requirements. It is not a guarantee of eligibility.\n\n" +
-    "For exact eligibility, please complete the detailed eligibility check for the selected scheme."
+        return String(
+          a.scheme.name
+        ).localeCompare(
+          String(b.scheme.name)
+        );
+      })
+      .slice(0, 5);
+
+  let reply =
+    "Schemes You May Be Eligible For\n\n";
+
+  reply +=
+    "Based on the information you provided, these are your strongest preliminary matches:\n\n";
+
+  scoredSchemes.forEach(
+    (item, index) => {
+      const scheme = item.scheme;
+
+      reply +=
+        `${index + 1}. ${scheme.name}\n\n`;
+
+      reply +=
+        `Preliminary Match: ${item.score}%\n\n`;
+
+      reply +=
+        `About the Scheme\n${
+          scheme.description ||
+          "Description not available."
+        }\n\n`;
+
+      reply +=
+        `Benefit\n${
+          scheme.benefit ||
+          "Benefit information not available."
+        }\n\n`;
+
+      reply +=
+        "────────────────────────\n\n";
+    }
   );
+
+  reply +=
+    "Note:The Match Score is only a preliminary indication based on the information you provided. It is not a guarantee of eligibility.\n\n";
+
+  reply +=
+    "For exact eligibility, please use the detailed eligibility checker.";
+
+  return reply;
 };
 
 // ============================================================
-// SPECIFIC SCHEME ELIGIBILITY
+// SPECIFIC ELIGIBILITY RESPONSE
 // ============================================================
 
 const buildSpecificEligibilityReply = (
@@ -1387,16 +1041,16 @@ const buildSpecificEligibilityReply = (
     );
 
   let reply =
-    `Checking your information against:\n\n${scheme.name}\n\n`;
+    `Eligibility Check\n\n ${scheme.name}\n\n`;
 
   reply +=
-    `Description:\n${
+    `About the Scheme\n${
       scheme.description ||
       "Description not available."
     }\n\n`;
 
   reply +=
-    `Benefit:\n${
+    `Benefit\n${
       scheme.benefit ||
       "Benefit information not available."
     }\n\n`;
@@ -1404,31 +1058,25 @@ const buildSpecificEligibilityReply = (
   reply +=
     `Preliminary Match Score: ${score}%\n\n`;
 
-  if (
-    possibleMatches.length > 0
-  ) {
+  if (possibleMatches.length > 0) {
     reply +=
-      "Based on the information you have provided so far, you appear to be a possible match for this scheme.\n\n";
+      " Based on the information you provided, you appear to be a possible match for this scheme.\n\n";
   } else {
     reply +=
-      "Based on the information you have provided, you do not appear to meet one or more of the basic requirements for this scheme.\n\n";
+      " Based on the information you provided, you do not appear to meet one or more of the basic requirements for this scheme.\n\n";
   }
 
   reply +=
-    "Important: This is only a preliminary check. The scheme may have additional requirements that are checked by the detailed eligibility checker.";
+    "Important: This is only a preliminary check. Additional scheme-specific requirements may apply.";
 
-  if (
-    scheme.application_url
-  ) {
+  if (scheme.application_url) {
     reply +=
-      `\n\nApplication:\n${scheme.application_url}`;
+      `\n\nApplication: ${scheme.application_url}`;
   }
 
-  if (
-    scheme.source_url
-  ) {
+  if (scheme.source_url) {
     reply +=
-      `\n\nOfficial Source:\n${scheme.source_url}`;
+      `\n\nOfficial Source: ${scheme.source_url}`;
   }
 
   return reply;
@@ -1442,54 +1090,33 @@ const findSpecificScheme = (
   schemes,
   userMessage
 ) => {
-  const message =
-    normalize(userMessage);
+  const message = normalize(userMessage);
 
-  // ==========================================================
-  // EXACT FULL NAME
-  // ==========================================================
+  // EXACT NAME
+  const exactMatch = schemes.find(
+    (scheme) =>
+      normalize(scheme.name) === message
+  );
 
-  const exactMatch =
-    schemes.find(
-      (scheme) =>
-        normalize(
-          scheme.name
-        ) === message
-    );
+  if (exactMatch) return exactMatch;
 
-  if (exactMatch) {
-    return exactMatch;
+  // FULL NAME INSIDE MESSAGE
+  const fullNameMatch = schemes.find(
+    (scheme) => {
+      const name = normalize(scheme.name);
+
+      return (
+        name.length >= 8 &&
+        message.includes(name)
+      );
+    }
+  );
+
+  if (fullNameMatch) {
+    return fullNameMatch;
   }
 
-  // ==========================================================
-  // FULL SCHEME NAME INSIDE MESSAGE
-  // ==========================================================
-
-  const nameMatch =
-    schemes.find(
-      (scheme) => {
-        const schemeName =
-          normalize(
-            scheme.name
-          );
-
-        return (
-          schemeName.length >= 8 &&
-          message.includes(
-            schemeName
-          )
-        );
-      }
-    );
-
-  if (nameMatch) {
-    return nameMatch;
-  }
-
-  // ==========================================================
-  // GENERIC QUESTIONS
-  // ==========================================================
-
+  // GENERIC QUERIES
   const genericPhrases = [
     "student scholarship",
     "student scholarships",
@@ -1505,6 +1132,10 @@ const findSpecificScheme = (
     "available scholarships",
     "government schemes",
     "all schemes",
+    "post matric scholarship",
+    "pre matric scholarship",
+    "college scholarship",
+    "higher education scholarship",
   ];
 
   if (
@@ -1516,10 +1147,7 @@ const findSpecificScheme = (
     return null;
   }
 
-  // ==========================================================
   // REMOVE COMMON WORDS
-  // ==========================================================
-
   const ignoredWords = [
     "tell",
     "about",
@@ -1557,100 +1185,67 @@ const findSpecificScheme = (
     "qualify",
     "get",
     "check",
+    "do",
+    "you",
   ];
 
-  const words =
-    message
-      .split(/\s+/)
-      .map((word) =>
-        word.replace(
-          /[^a-z0-9-]/g,
-          ""
-        )
+  const words = message
+    .split(/\s+/)
+    .map((word) =>
+      word.replace(
+        /[^a-z0-9]/g,
+        ""
       )
-      .filter(
-        (word) =>
-          word.length >= 4 &&
-          !ignoredWords.includes(word)
-      );
+    )
+    .filter(
+      (word) =>
+        word.length >= 3 &&
+        !ignoredWords.includes(word)
+    );
 
-  if (
-    words.length === 0
-  ) {
-    return null;
-  }
+  if (!words.length) return null;
 
-  // ==========================================================
   // SCORE SCHEME NAMES
-  // ==========================================================
-
-  const scored =
-    schemes
-      .map((scheme) => {
-        const schemeName =
-          normalize(
-            scheme.name
-          );
-
-        const nameWords =
-          schemeName
-            .split(
-              /[\s\-–—/(),]+/
-            )
-            .filter(
-              (word) =>
-                word.length >= 3
-            );
-
-        let score = 0;
-
-        for (
-          const word of words
-        ) {
-          // Exact word
-          if (
-            nameWords.includes(word)
-          ) {
-            score += 3;
-          }
-
-          // Partial word
-          else if (
-            nameWords.some(
-              (nameWord) =>
-                nameWord.includes(word) ||
-                word.includes(nameWord)
-            )
-          ) {
-            score += 1;
-          }
-        }
-
-        return {
-          scheme,
-          score,
-        };
-      })
-      .filter(
-        (item) =>
-          item.score >= 3
+  const scored = schemes
+    .map((scheme) => {
+      const nameWords = normalize(
+        scheme.name
       )
-      .sort(
-        (a, b) =>
-          b.score - a.score
-      );
+        .split(/[\s\-–—/(),.&]+/)
+        .filter(
+          (word) => word.length >= 3
+        );
 
-  if (
-    scored.length > 0
-  ) {
-    return scored[0].scheme;
-  }
+      let score = 0;
 
-  return null;
+      for (const word of words) {
+        if (nameWords.includes(word)) {
+          score += 3;
+        } else if (
+          nameWords.some(
+            (nameWord) =>
+              nameWord.includes(word) ||
+              word.includes(nameWord)
+          )
+        ) {
+          score += 1;
+        }
+      }
+
+      return { scheme, score };
+    })
+    .filter((item) => item.score >= 3)
+    .sort(
+      (a, b) => b.score - a.score
+    );
+
+  return scored.length
+    ? scored[0].scheme
+    : null;
 };
 
 // ============================================================
-// SPECIFIC SCHEME DETAILS
+// SCHEME DETAILS
 // ============================================================
 
 const buildSchemeDetailsReply = (
@@ -1661,13 +1256,13 @@ const buildSchemeDetailsReply = (
     `${scheme.name}\n\n`;
 
   reply +=
-    `Description:\n${
+    `About the Scheme\n${
       scheme.description ||
       "Description not available."
     }\n\n`;
 
   reply +=
-    `Benefit:\n${
+    `Benefit\n${
       scheme.benefit ||
       "Benefit information not available."
     }\n\n`;
@@ -1675,10 +1270,7 @@ const buildSchemeDetailsReply = (
   const hasProfileData =
     BASIC_FIELDS.some(
       (field) =>
-        hasValue(
-          profile,
-          field
-        )
+        hasValue(profile, field)
     );
 
   if (hasProfileData) {
@@ -1689,28 +1281,54 @@ const buildSchemeDetailsReply = (
       );
 
     reply +=
-      `Preliminary Match Score:\n${score}%\n\n`;
+      `Preliminary Match Score: ${score}%\n\n`;
   }
 
   reply +=
-    "Eligibility:\n" +
-    "This scheme may have additional requirements. Use the detailed eligibility checker to verify all conditions.\n\n";
+    "Eligibility\n" +
+    "This scheme may have additional requirements. Use the detailed eligibility checker to verify all conditions.\n";
 
-  if (
-    scheme.application_url
-  ) {
+  if (scheme.application_url) {
     reply +=
-      `Application:\n${scheme.application_url}\n\n`;
+      `\nApplication: ${scheme.application_url}\n`;
   }
 
-  if (
-    scheme.source_url
-  ) {
+  if (scheme.source_url) {
     reply +=
-      `Official Source:\n${scheme.source_url}`;
+      `\n Official Source: ${scheme.source_url}`;
   }
 
   return reply;
+};
+
+// ============================================================
+// CHECK IF SCHEME IS STUDENT RELATED
+// ============================================================
+
+const isStudentFocusedScheme = (
+  scheme
+) => {
+  const text = normalize(
+    `${scheme.name || ""} ${
+      scheme.description || ""
+    } ${scheme.benefit || ""} ${
+      scheme.course || ""
+    } ${scheme.program || ""} ${
+      scheme.class_level || ""
+    }`
+  );
+
+  return (
+    Number(scheme.currently_enrolled) === 1 ||
+    Boolean(
+      scheme.course ||
+      scheme.program ||
+      scheme.class_level
+    ) ||
+    /\b(student|students|scholarship|school|college|education|post[- ]?matric|pre[- ]?matric)\b/i.test(
+      text
+    )
+  );
 };
 
 // ============================================================
@@ -1722,59 +1340,41 @@ const searchSchemes = (
   message,
   profile = {}
 ) => {
-  const normalizedMessage =
-    normalize(message);
+  const text = normalize(message);
 
-  const genericStudentQuery =
-    normalizedMessage.includes(
-      "student"
-    ) ||
-    normalizedMessage.includes(
-      "students"
-    ) ||
-    normalizedMessage.includes(
-      "scholarship"
+  const studentQuery =
+    /\b(student|students|scholarship|scholarships|school|college)\b/i.test(
+      text
     );
 
-  // ==========================================================
-  // IF USER IS A STUDENT AND ASKS FOR STUDENT SCHEMES
-  // USE PROFILE INFORMATION
-  // ==========================================================
+  let searchableSchemes = schemes;
 
+  // USE PROFILE FOR STUDENT SEARCH
   if (
-    genericStudentQuery &&
-    isYes(
-      profile.currentlyEnrolled
-    )
+    studentQuery &&
+    isYes(profile.currentlyEnrolled)
   ) {
-    const studentSchemes =
+    const filtered =
       filterPossibleSchemes(
         schemes,
         profile
       );
 
-    if (
-      studentSchemes.length > 0
-    ) {
-      return studentSchemes
-        .sort(
-          (a, b) =>
-            calculateMatchScore(
-              b,
-              profile
-            ) -
-            calculateMatchScore(
-              a,
-              profile
-            )
-        )
-        .slice(0, 5);
+    if (filtered.length) {
+      searchableSchemes = filtered;
     }
+  } else if (
+    studentQuery &&
+    !hasValue(
+      profile,
+      "currentlyEnrolled"
+    )
+  ) {
+    searchableSchemes =
+      schemes.filter(
+        isStudentFocusedScheme
+      );
   }
-
-  // ==========================================================
-  // GENERAL KEYWORD SEARCH
-  // ==========================================================
 
   const ignoredWords = [
     "show",
@@ -1798,34 +1398,55 @@ const searchSchemes = (
     "is",
     "scholarship",
     "scholarships",
+    "all",
   ];
 
-  const words =
-    normalizedMessage
-      .split(/\s+/)
-      .map((word) =>
-        word.replace(
-          /[^a-z0-9-]/g,
-          ""
-        )
+  const words = text
+    .split(/\s+/)
+    .map((word) =>
+      word.replace(
+        /[^a-z0-9]/g,
+        ""
       )
-      .filter(
-        (word) =>
-          word.length >= 3 &&
-          !ignoredWords.includes(word)
-      );
+    )
+    .filter(
+      (word) =>
+        word.length >= 3 &&
+        !ignoredWords.includes(word)
+    );
 
-  if (
-    words.length === 0
-  ) {
-    return schemes.slice(
+  if (!words.length) {
+    if (
+      hasValue(
+        profile,
+        "currentlyEnrolled"
+      )
+    ) {
+      return searchableSchemes
+        .map((scheme) => ({
+          scheme,
+          score:
+            calculateMatchScore(
+              scheme,
+              profile
+            ),
+        }))
+        .sort(
+          (a, b) =>
+            b.score - a.score
+        )
+        .slice(0, 5)
+        .map((item) => item.scheme);
+    }
+
+    return searchableSchemes.slice(
       0,
       5
     );
   }
 
   const matches =
-    schemes.filter(
+    searchableSchemes.filter(
       (scheme) => {
         const searchableText =
           normalize(
@@ -1845,9 +1466,9 @@ const searchSchemes = (
       }
     );
 
-  return matches.length > 0
+  return matches.length
     ? matches.slice(0, 5)
-    : schemes.slice(0, 5);
+    : searchableSchemes.slice(0, 5);
 };
 
 // ============================================================
@@ -1860,41 +1481,31 @@ const buildNaturalResponse = (
 ) => {
   const knownDetails = [];
 
-  if (
-    hasValue(profile, "age")
-  ) {
+  if (hasValue(profile, "age")) {
     knownDetails.push(
       `you are ${profile.age} years old`
     );
   }
 
-  if (
-    hasValue(profile, "gender")
-  ) {
+  if (hasValue(profile, "gender")) {
     knownDetails.push(
-      String(profile.gender)
+      `gender ${profile.gender}`
     );
   }
 
-  if (
-    isYes(profile.tnResident)
-  ) {
+  if (isYes(profile.tnResident)) {
     knownDetails.push(
       "a Tamil Nadu resident"
     );
   }
 
-  if (
-    isNo(profile.tnResident)
-  ) {
+  if (isNo(profile.tnResident)) {
     knownDetails.push(
       "not a Tamil Nadu resident"
     );
   }
 
-  if (
-    hasValue(profile, "community")
-  ) {
+  if (hasValue(profile, "community")) {
     knownDetails.push(
       `${profile.community} community`
     );
@@ -1934,6 +1545,9 @@ const buildNaturalResponse = (
   }
 
   if (
+    isYes(
+      profile.currentlyEnrolled
+    ) &&
     hasValue(
       profile,
       "educationLevel"
@@ -1944,17 +1558,13 @@ const buildNaturalResponse = (
     );
   }
 
-  if (
-    isYes(profile.disability)
-  ) {
+  if (isYes(profile.disability)) {
     knownDetails.push(
       "a person with a disability"
     );
   }
 
-  if (
-    isNo(profile.disability)
-  ) {
+  if (isNo(profile.disability)) {
     knownDetails.push(
       "no personal disability"
     );
@@ -1981,21 +1591,15 @@ const buildNaturalResponse = (
   }
 
   if (nextField) {
-    if (
-      knownDetails.length > 0
-    ) {
+    if (knownDetails.length) {
       return (
         `Got it. I have noted that ${knownDetails.join(
           ", "
-        )}.\n\n${
-          QUESTIONS[nextField].label
-        }`
+        )}.\n\n${QUESTIONS[nextField].label}`
       );
     }
 
-    return QUESTIONS[
-      nextField
-    ].label;
+    return QUESTIONS[nextField].label;
   }
 
   return null;
@@ -2005,10 +1609,7 @@ const buildNaturalResponse = (
 // MAIN CHAT CONTROLLER
 // ============================================================
 
-const chat = async (
-  req,
-  res
-) => {
+const chat = async (req, res) => {
   try {
     const {
       message,
@@ -2016,42 +1617,26 @@ const chat = async (
       isAnswering = false,
     } = req.body;
 
-    // ========================================================
-    // VALIDATE MESSAGE
-    // ========================================================
-
-    if (
-      !message ||
-      !message.trim()
-    ) {
+    if (!message || !message.trim()) {
       return res.status(400).json({
         success: false,
-        message:
-          "Message is required.",
+        message: "Message is required.",
       });
     }
 
-    const userMessage =
-      message.trim();
-
+    const userMessage = message.trim();
     const normalizedMessage =
       normalize(userMessage);
 
-    // ========================================================
     // GET ACTIVE SCHEMES
-    // ========================================================
+    const [schemes] = await db.query(`
+      SELECT *
+      FROM schemes
+      WHERE status = 'active'
+      ORDER BY scheme_id ASC
+    `);
 
-    const [schemes] =
-      await db.query(`
-        SELECT *
-        FROM schemes
-        WHERE status = 'active'
-        ORDER BY scheme_id ASC
-      `);
-
-    if (
-      schemes.length === 0
-    ) {
+    if (!schemes.length) {
       return res.json({
         success: true,
         reply:
@@ -2059,21 +1644,14 @@ const chat = async (
       });
     }
 
-    // ========================================================
-    // EXTRACT NATURAL INFORMATION
-    // ========================================================
-
+    // EXTRACT PROFILE
     let workingProfile =
       extractProfileFromMessage(
         userMessage,
         profile
       );
 
-    // ========================================================
-    // IF WE ARE ANSWERING A QUESTION
-    // CONVERT THE ANSWER USING nextField
-    // ========================================================
-
+    // CONVERT ANSWER USING FRONTEND nextField
     if (
       isAnswering &&
       profile.nextField
@@ -2088,20 +1666,35 @@ const chat = async (
       delete workingProfile.nextField;
     }
 
-    // ========================================================
-    // SPECIFIC SCHEME DETECTION
-    // ========================================================
-
+    // SPECIFIC SCHEME
     const directScheme =
       findSpecificScheme(
         schemes,
         normalizedMessage
       );
 
-    // ========================================================
-    // INFORMATION REQUEST
-    // ========================================================
+    // TARGET SCHEME FROM PREVIOUS QUESTION
+    let targetScheme = null;
 
+    if (
+      isAnswering &&
+      workingProfile.targetScheme
+    ) {
+      targetScheme =
+        schemes.find(
+          (scheme) =>
+            scheme.scheme_id ===
+            workingProfile.targetScheme
+        ) || null;
+    }
+
+    // If user directly mentioned another scheme,
+    // it becomes the new target.
+    if (directScheme) {
+      targetScheme = directScheme;
+    }
+
+    // INFORMATION REQUEST
     const informationKeywords = [
       "tell me about",
       "details of",
@@ -2128,28 +1721,22 @@ const chat = async (
     ) {
       return res.json({
         success: true,
-
         reply:
           buildSchemeDetailsReply(
             directScheme,
             workingProfile
           ),
-
         scheme:
           formatScheme(
             directScheme,
             workingProfile
           ),
-
         profile:
           workingProfile,
       });
     }
 
-    // ========================================================
-    // SPECIFIC SCHEME ELIGIBILITY
-    // ========================================================
-
+    // SPECIFIC ELIGIBILITY
     const eligibilityKeywords = [
       "eligible",
       "eligibility",
@@ -2169,97 +1756,84 @@ const chat = async (
           )
       );
 
+    const continuingSpecificCheck =
+      targetScheme &&
+      isAnswering &&
+      !directScheme;
+
     if (
-      asksSpecificEligibility
+      asksSpecificEligibility ||
+      continuingSpecificCheck
     ) {
+      const schemeToCheck =
+        directScheme ||
+        targetScheme;
+
       const nextField =
         getNextQuestion(
           workingProfile
         );
 
-      // ------------------------------------------------------
-      // NEED MORE INFORMATION
-      // ------------------------------------------------------
-
       if (nextField) {
+        workingProfile.targetScheme =
+          schemeToCheck.scheme_id;
+
         return res.json({
           success: true,
-
           reply:
-            `Sure! Let's check your eligibility for "${directScheme.name}".\n\n` +
+            `Sure! Let's check your eligibility for "${schemeToCheck.name}".\n\n` +
             buildNaturalResponse(
               workingProfile,
               nextField
             ),
-
           nextField,
-
           profile:
             workingProfile,
-
           targetScheme:
-            directScheme.scheme_id,
+            schemeToCheck.scheme_id,
         });
       }
 
-      // ------------------------------------------------------
-      // ALL INFORMATION AVAILABLE
-      // ------------------------------------------------------
+      delete workingProfile.targetScheme;
 
       return res.json({
         success: true,
-
         reply:
           buildSpecificEligibilityReply(
-            directScheme,
+            schemeToCheck,
             workingProfile
           ),
-
         scheme:
           formatScheme(
-            directScheme,
+            schemeToCheck,
             workingProfile
           ),
-
         profile:
           workingProfile,
-
-        targetScheme:
-          directScheme.scheme_id,
-
         confirmed: false,
       });
     }
 
-    // ========================================================
-    // DIRECT SPECIFIC SCHEME
-    // ========================================================
-
+    // DIRECT SCHEME DETAILS
     if (directScheme) {
       return res.json({
         success: true,
-
         reply:
           buildSchemeDetailsReply(
             directScheme,
             workingProfile
           ),
-
         scheme:
           formatScheme(
             directScheme,
             workingProfile
           ),
-
         profile:
           workingProfile,
       });
     }
 
-    // ========================================================
-    // GENERAL ELIGIBILITY REQUEST
-    // ========================================================
-
+    // GENERAL ELIGIBILITY
     const generalEligibilityKeywords = [
       "eligible",
       "eligibility",
@@ -2278,44 +1852,29 @@ const chat = async (
           normalizedMessage.includes(
             keyword
           )
-      ) ||
-      isAnswering;
+      ) || isAnswering;
 
-    if (
-      wantsEligibility
-    ) {
+    if (wantsEligibility) {
+      delete workingProfile.targetScheme;
+
       const nextField =
         getNextQuestion(
           workingProfile
         );
 
-      // ------------------------------------------------------
-      // ASK NEXT QUESTION
-      // ------------------------------------------------------
-
       if (nextField) {
-        const naturalReply =
-          buildNaturalResponse(
-            workingProfile,
-            nextField
-          );
-
         return res.json({
           success: true,
-
           reply:
-            naturalReply,
-
+            buildNaturalResponse(
+              workingProfile,
+              nextField
+            ),
           nextField,
-
           profile:
             workingProfile,
         });
       }
-
-      // ------------------------------------------------------
-      // FILTER SCHEMES
-      // ------------------------------------------------------
 
       const possibleSchemes =
         filterPossibleSchemes(
@@ -2323,15 +1882,10 @@ const chat = async (
           workingProfile
         );
 
-      // ------------------------------------------------------
-      // SCORE + SORT
-      // ------------------------------------------------------
-
       const sortedSchemes =
         possibleSchemes
           .map((scheme) => ({
             ...scheme,
-
             _matchScore:
               calculateMatchScore(
                 scheme,
@@ -2345,24 +1899,15 @@ const chat = async (
           );
 
       const resultSchemes =
-        sortedSchemes.slice(
-          0,
-          5
-        );
-
-      // ------------------------------------------------------
-      // RESPONSE
-      // ------------------------------------------------------
+        sortedSchemes.slice(0, 5);
 
       return res.json({
         success: true,
-
         reply:
           buildPossibleSchemesReply(
             resultSchemes,
             workingProfile
           ),
-
         schemes:
           resultSchemes.map(
             (scheme) =>
@@ -2371,18 +1916,13 @@ const chat = async (
                 workingProfile
               )
           ),
-
         profile:
           workingProfile,
-
         confirmed: false,
       });
     }
 
-    // ========================================================
     // GENERAL SCHEME QUERY
-    // ========================================================
-
     const generalKeywords = [
       "scheme",
       "schemes",
@@ -2401,9 +1941,7 @@ const chat = async (
           )
       );
 
-    if (
-      isGeneralQuery
-    ) {
+    if (isGeneralQuery) {
       const resultSchemes =
         searchSchemes(
           schemes,
@@ -2411,36 +1949,34 @@ const chat = async (
           workingProfile
         );
 
-      const list =
-        resultSchemes
-          .map(
-            (scheme, index) => {
-              let text =
-                `${index + 1}. ${scheme.name}`;
+      let list = resultSchemes
+        .map((scheme, index) => {
+          let text =
+            `${index + 1}. ${scheme.name}\n\n`;
 
-              text +=
-                `\n   Description: ${
-                  scheme.description ||
-                  "Description not available."
-                }`;
+          text +=
+            `About: ${
+              scheme.description ||
+              "Description not available."
+            }\n\n`;
 
-              text +=
-                `\n   Benefit: ${
-                  scheme.benefit ||
-                  "Benefit information not available."
-                }`;
+          text +=
+            `Benefit: ${
+              scheme.benefit ||
+              "Benefit information not available."
+            }`;
 
-              return text;
-            }
-          )
-          .join("\n\n");
+          return text;
+        })
+        .join(
+          "\n\n────────────────────────\n\n"
+        );
 
       return res.json({
         success: true,
-
         reply:
-          `Here are some government schemes that may be relevant:\n\n${list}\n\nYou can ask me about any specific scheme to learn more.`,
-
+          `Government Schemes\n\n${list}\n\n` +
+          "You can ask me about any specific scheme to learn more.",
         schemes:
           resultSchemes.map(
             (scheme) =>
@@ -2449,29 +1985,57 @@ const chat = async (
                 workingProfile
               )
           ),
-
         profile:
           workingProfile,
       });
     }
 
-    // ========================================================
-    // NATURAL CONVERSATION
-    // ========================================================
-
+    // NATURAL PROFILE COMPLETION
     const nextField =
       getNextQuestion(
         workingProfile
       );
 
-    if (
-      Object.keys(
+    const profileChanged =
+      JSON.stringify(
         workingProfile
-      ).length >
-      Object.keys(
-        profile
-      ).length
+      ) !==
+      JSON.stringify(profile);
+
+    if (
+      profileChanged &&
+      !nextField
     ) {
+      const possibleSchemes =
+        filterPossibleSchemes(
+          schemes,
+          workingProfile
+        );
+
+      return res.json({
+        success: true,
+        reply:
+          buildPossibleSchemesReply(
+            possibleSchemes,
+            workingProfile
+          ),
+        schemes:
+          possibleSchemes
+            .slice(0, 5)
+            .map(
+              (scheme) =>
+                formatScheme(
+                  scheme,
+                  workingProfile
+                )
+            ),
+        profile:
+          workingProfile,
+        confirmed: false,
+      });
+    }
+
+    if (profileChanged) {
       const naturalReply =
         buildNaturalResponse(
           workingProfile,
@@ -2481,43 +2045,31 @@ const chat = async (
       if (naturalReply) {
         return res.json({
           success: true,
-
-          reply:
-            naturalReply,
-
+          reply: naturalReply,
           nextField:
             nextField || null,
-
           profile:
             workingProfile,
         });
       }
     }
 
-    // ========================================================
     // GREETING
-    // ========================================================
-
     if (
-      /^(hi|hello|hey|hai|good morning|good afternoon|good evening)\b/.test(
+      /^(hi|hello|hey|hai|good morning|good afternoon|good evening)\b/i.test(
         normalizedMessage
       )
     ) {
       return res.json({
         success: true,
-
         reply:
           "Hi! I'm SchemeCheck Assistant. I can help you find government schemes, check possible eligibility, and explain scheme benefits.\n\nYou can simply tell me about yourself, or ask about a specific scheme.",
       });
     }
 
-    // ========================================================
     // DEFAULT
-    // ========================================================
-
     return res.json({
       success: true,
-
       reply:
         "Sure! I can help you with government schemes.\n\n" +
         "You can ask naturally, for example:\n\n" +
@@ -2528,7 +2080,6 @@ const chat = async (
         "• Am I eligible for Pudhumai Penn Thittam?\n" +
         "• What benefits does this scheme provide?",
     });
-
   } catch (error) {
     console.error(
       "Chatbot Error:",
@@ -2537,16 +2088,11 @@ const chat = async (
 
     return res.status(500).json({
       success: false,
-
       message:
         "Something went wrong while processing your question.",
     });
   }
 };
-
-// ============================================================
-// EXPORT
-// ============================================================
 
 module.exports = {
   chat,

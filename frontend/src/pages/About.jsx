@@ -27,8 +27,8 @@ const teamMembers = [
     icon: Code2,
   },
   {
-    name: "Friend's Name",
-    role: "AI Assistant Developer",
+    name: "Ayisha Banu S",
+    role: "Full Stack Developer",
     description:
       "Designed and developed the AI assistant that helps users interact with the platform, understand government schemes, and get assistance while navigating the system.",
     contributions: [
@@ -37,7 +37,7 @@ const teamMembers = [
       "AI Integration",
       "User Assistance",
     ],
-    portfolio: "https://friend-portfolio-url.com",
+    portfolio: "https://ayishabanudev.netlify.app/",
     icon: Bot,
   },
 ];
