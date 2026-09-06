@@ -5,6 +5,7 @@ require("dotenv").config();
 const eligibilityRoutes = require("./routes/eligibilityroutes");
 const schemesRoutes = require("./routes/schemesroutes");
 const schemeManagementRoutes = require("./routes/schememanageroutes");
+const chatRoutes = require("./routes/chatroutes");
 
 const db = require("./config/db");
 
@@ -31,7 +32,8 @@ app.use("/api/schemes", schemesRoutes);
 // Scheme management routes
 app.use("/api/scheme-management", schemeManagementRoutes);
 
-
+// chat router routes
+app.use("/api/chat", chatRoutes);
 // =========================================================
 // TEST ROUTE
 // =========================================================
