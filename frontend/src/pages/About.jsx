@@ -8,6 +8,8 @@ import {
   Database,
 } from "lucide-react";
 
+import Navbar from "@/components/custom/Navbar";
+
 const teamMembers = [
   {
     name: "Madhavan R",
@@ -44,6 +46,8 @@ const teamMembers = [
 
 const About = () => {
   return (
+<>
+<Navbar/>
     <main className="min-h-screen bg-background text-foreground">
       {/* Hero */}
       <section className="px-6 pb-16 pt-24 sm:px-10 lg:px-16">
@@ -281,6 +285,7 @@ const About = () => {
         </p>
       </footer>
     </main>
+    </>
   );
 };
 
