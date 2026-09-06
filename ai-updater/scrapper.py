@@ -6,6 +6,7 @@ import certifi
 import urllib3
 from bs4 import BeautifulSoup
 import sys
+import time
 
 if sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -18,6 +19,8 @@ USER_AGENT = (
 )
 
 REQUEST_TIMEOUT = 20
+MAX_REQUEST_ATTEMPTS = 3
+RETRY_DELAY = 3
 
 MAX_EXTRACTED_CHARACTERS = 12000
 
@@ -49,96 +52,148 @@ def scrape_page(url):
         If normal SSL verification fails, a controlled
         fallback request is attempted.
 
-    Duplicate URL handling and concurrent scraping are
-    handled by main.py.
+    Temporary connection failures are retried before
+    the webpage is marked as failed.
     """
 
     if not url:
         return None
 
+    for attempt in range(1, MAX_REQUEST_ATTEMPTS + 1):
 
-    try:
+        try:
 
-        response = requests.get(
-            url,
-            timeout=REQUEST_TIMEOUT,
-            headers={
-                "User-Agent": USER_AGENT
-            },
-            verify=certifi.where(),
-        )
+            response = requests.get(
+                url,
+                timeout=REQUEST_TIMEOUT,
+                headers={
+                    "User-Agent": USER_AGENT
+                },
+                verify=certifi.where(),
+            )
 
-        response.raise_for_status()
+            response.raise_for_status()
 
-        return parse_webpage(
-            response.text
-        )
+            return parse_webpage(
+                response.text
+            )
 
-    except requests.exceptions.SSLError as error:
-
-        print(
-            "⚠️ SSL certificate verification failed."
-        )
-
-        print(
-            f"URL: {url}"
-        )
-
-        print(
-            f"Error: {error}"
-        )
-
-
-        if is_allowed_ssl_fallback(url):
+        except requests.exceptions.SSLError as error:
 
             print(
-                "🔄 Trying approved SSL fallback "
-                "for official Tamil Nadu source..."
+                "⚠️ SSL certificate verification failed."
             )
 
-            return scrape_with_ssl_fallback(
-                url
+            print(
+                f"URL: {url}"
             )
 
-        print(
-            "❌ SSL fallback is not allowed for this domain."
-        )
+            print(
+                f"Error: {error}"
+            )
 
-        return None
+            if is_allowed_ssl_fallback(url):
 
-    except requests.RequestException as error:
+                print(
+                    "🔄 Trying approved SSL fallback "
+                    "for official Tamil Nadu source..."
+                )
 
-        print(
-            "❌ Failed to fetch webpage:"
-        )
+                return scrape_with_ssl_fallback(
+                    url
+                )
 
-        print(
-            f"URL: {url}"
-        )
+            print(
+                "❌ SSL fallback is not allowed for this domain."
+            )
 
-        print(
-            f"Error: {error}"
-        )
+            return None
 
-        return None
+        except requests.exceptions.Timeout as error:
 
-    except Exception as error:
+            print(
+                f"⚠️ Request timeout "
+                f"(attempt {attempt}/{MAX_REQUEST_ATTEMPTS})"
+            )
 
-        print(
-            "❌ Unexpected scraping error:"
-        )
+            print(
+                f"URL: {url}"
+            )
 
-        print(
-            f"URL: {url}"
-        )
+            print(
+                f"Error: {error}"
+            )
 
-        print(
-            f"Error: {error}"
-        )
+            if attempt < MAX_REQUEST_ATTEMPTS:
 
-        return None
+                print(
+                    f"🔄 Retrying in {RETRY_DELAY} seconds..."
+                )
 
+                time.sleep(
+                    RETRY_DELAY
+                )
 
+                continue
+
+            print(
+                "❌ Request timed out after "
+                f"{MAX_REQUEST_ATTEMPTS} attempts."
+            )
+
+            return None
+
+        except requests.RequestException as error:
+
+            print(
+                f"⚠️ Request failed "
+                f"(attempt {attempt}/{MAX_REQUEST_ATTEMPTS})"
+            )
+
+            print(
+                f"URL: {url}"
+            )
+
+            print(
+                f"Error: {error}"
+            )
+
+            if attempt < MAX_REQUEST_ATTEMPTS:
+
+                print(
+                    f"🔄 Retrying in {RETRY_DELAY} seconds..."
+                )
+
+                time.sleep(
+                    RETRY_DELAY
+                )
+
+                continue
+
+            print(
+                "❌ Failed to fetch webpage after "
+                f"{MAX_REQUEST_ATTEMPTS} attempts."
+            )
+
+            return None
+
+        except Exception as error:
+
+            print(
+                "❌ Unexpected scraping error:"
+            )
+
+            print(
+                f"URL: {url}"
+            )
+
+            print(
+                f"Error: {error}"
+            )
+
+            return None
+
+    return None
 def is_allowed_ssl_fallback(url):
     """
     Return True only for explicitly approved official
