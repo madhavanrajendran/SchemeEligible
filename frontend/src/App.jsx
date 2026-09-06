@@ -4,6 +4,7 @@ import Home from "/src/pages/Home";
 import Schemes from "/src/pages/Schemes";
 import Eligibility from "/src/pages/Eligibility";
 import Result from "/src/pages/Result";
+import About from "./pages/About";
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/schemes" element={<Schemes />} />
+        <Route path="/about" element={<About/>}/>
         <Route
           path="/eligibility/:schemeId"
           element={<Eligibility />}
