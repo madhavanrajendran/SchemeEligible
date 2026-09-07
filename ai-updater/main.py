@@ -11,9 +11,13 @@ from scrapper import (
     normalize_url,
     extract_scheme_content,
 )
+
 from analyzer import analyze_scheme
 from comparison import compare_scheme, print_changes
 from cache import has_content_changed, save_scheme_hash
+
+
+load_dotenv()
 
 
 # =========================================================
@@ -22,8 +26,8 @@ from cache import has_content_changed, save_scheme_hash
 
 BACKEND_URL = os.getenv(
     "BACKEND_URL",
-
 )
+
 MAX_GEMINI_REQUESTS = 20
 MAX_SCRAPE_WORKERS = 5
 
@@ -46,7 +50,10 @@ def get_all_schemes():
         response = requests.get(url, timeout=20)
 
         if not response.ok:
-            print(f"Failed to get schemes. Status: {response.status_code}")
+            print(
+                f"Failed to get schemes. "
+                f"Status: {response.status_code}"
+            )
             print(f"Response: {response.text}")
             return []
 
@@ -66,11 +73,15 @@ def get_all_schemes():
         return []
 
     except requests.RequestException as error:
-        print(f"Could not connect to backend: {error}")
+        print(
+            f"Could not connect to backend: {error}"
+        )
         return []
 
     except ValueError as error:
-        print(f"Backend returned invalid JSON: {error}")
+        print(
+            f"Backend returned invalid JSON: {error}"
+        )
         return []
 
 
@@ -97,7 +108,9 @@ def scrape_unique_url(url):
         scraped_text = scrape_page(normalized_url)
 
         if not scraped_text:
-            print(f"Scraping failed: {normalized_url}")
+            print(
+                f"Scraping failed: {normalized_url}"
+            )
 
             return {
                 "url": normalized_url,
@@ -109,7 +122,10 @@ def scrape_unique_url(url):
         content_hash = get_content_hash(scraped_text)
 
         if not content_hash:
-            print(f"Could not generate hash: {normalized_url}")
+            print(
+                f"Could not generate hash: "
+                f"{normalized_url}"
+            )
 
             return {
                 "url": normalized_url,
@@ -118,7 +134,10 @@ def scrape_unique_url(url):
                 "success": False,
             }
 
-        print(f"Scraping successful: {normalized_url}")
+        print(
+            f"Scraping successful: "
+            f"{normalized_url}"
+        )
 
         return {
             "url": normalized_url,
@@ -128,7 +147,10 @@ def scrape_unique_url(url):
         }
 
     except Exception as error:
-        print(f"Scraping error for {normalized_url}: {error}")
+        print(
+            f"Scraping error for "
+            f"{normalized_url}: {error}"
+        )
 
         return {
             "url": normalized_url,
@@ -159,6 +181,7 @@ def scrape_all_unique_urls(schemes):
     print("\n" + "=" * 60)
     print("WEBPAGE SCRAPING")
     print("=" * 60)
+
     print(f"Schemes: {len(schemes)}")
     print(f"Unique URLs: {len(urls)}")
     print(f"Workers: {MAX_SCRAPE_WORKERS}")
@@ -178,7 +201,7 @@ def scrape_all_unique_urls(schemes):
         future_to_url = {
             executor.submit(
                 scrape_unique_url,
-                url
+                url,
             ): url
             for url in urls
         }
@@ -191,7 +214,8 @@ def scrape_all_unique_urls(schemes):
 
             except Exception as error:
                 print(
-                    f"Unexpected scraping error for {url}: {error}"
+                    f"Unexpected scraping error "
+                    f"for {url}: {error}"
                 )
 
                 results[url] = {
@@ -210,6 +234,7 @@ def scrape_all_unique_urls(schemes):
     print("\n" + "-" * 60)
     print("SCRAPING SUMMARY")
     print("-" * 60)
+
     print(f"Unique URLs : {len(urls)}")
     print(f"Successful  : {successful}")
     print(f"Failed      : {len(urls) - successful}")
@@ -234,28 +259,56 @@ def process_scheme(
         status,
         gemini_requests,
         hit_limit,
-        changes
+        changes,
+        reason
     """
 
     scheme_id = scheme.get("scheme_id")
     scheme_name = scheme.get("name")
     source_url = scheme.get("source_url")
 
+    # -----------------------------------------------------
+    # Validate scheme
+    # -----------------------------------------------------
+
     if not scheme_id:
         print("\nScheme skipped: missing scheme_id.")
-        return "skipped", gemini_requests, False, []
+
+        return (
+            "skipped",
+            gemini_requests,
+            False,
+            [],
+            "Missing scheme_id.",
+        )
 
     if not scheme_name:
         print(
-            f"\nScheme {scheme_id} skipped: missing name."
+            f"\nScheme {scheme_id} skipped: "
+            f"missing name."
         )
-        return "skipped", gemini_requests, False, []
+
+        return (
+            "skipped",
+            gemini_requests,
+            False,
+            [],
+            "Missing scheme name.",
+        )
 
     if not source_url:
         print(
-            f"\n{scheme_name} skipped: missing source_url."
+            f"\n{scheme_name} skipped: "
+            f"missing source_url."
         )
-        return "skipped", gemini_requests, False, []
+
+        return (
+            "skipped",
+            gemini_requests,
+            False,
+            [],
+            "Missing source_url.",
+        )
 
     normalized_url = normalize_url(source_url)
 
@@ -265,29 +318,81 @@ def process_scheme(
     print(f"Source: {source_url}")
     print("=" * 60)
 
-    scraped_result = scraped_results.get(normalized_url)
+    # -----------------------------------------------------
+    # Get scraping result
+    # -----------------------------------------------------
+
+    scraped_result = scraped_results.get(
+        normalized_url
+    )
 
     if not scraped_result:
         print("No scraping result available.")
-        return "failed", gemini_requests, False, []
+
+        return (
+            "source_unavailable",
+            gemini_requests,
+            False,
+            [],
+            "No scraping result available.",
+        )
+
+    # -----------------------------------------------------
+    # IMPORTANT:
+    # Scraping failure is NOT a processing failure.
+    # -----------------------------------------------------
 
     if not scraped_result["success"]:
-        print("Scraping failed. Skipping scheme.")
-        return "failed", gemini_requests, False, []
+        print(
+            "Source website could not be scraped."
+        )
+
+        print(
+            "Skipping scheme without marking "
+            "it as a processing failure."
+        )
+
+        return (
+            "source_unavailable",
+            gemini_requests,
+            False,
+            [],
+            "Source website could not be scraped "
+            "or was unreachable.",
+        )
 
     scraped_text = scraped_result["text"]
     content_hash = scraped_result["hash"]
+
+    # -----------------------------------------------------
+    # Check cache
+    # -----------------------------------------------------
 
     if not has_content_changed(
         scheme_id,
         normalized_url,
         content_hash,
     ):
-        print("Website has not changed. Skipping AI analysis.")
+        print(
+            "Website has not changed. "
+            "Skipping AI analysis."
+        )
 
-        return "unchanged", gemini_requests, False, []
+        return (
+            "unchanged",
+            gemini_requests,
+            False,
+            [],
+            None,
+        )
 
-    print("New or changed webpage detected.")
+    print(
+        "New or changed webpage detected."
+    )
+
+    # -----------------------------------------------------
+    # Extract scheme-specific content
+    # -----------------------------------------------------
 
     scheme_content = extract_scheme_content(
         scraped_text,
@@ -295,24 +400,54 @@ def process_scheme(
     )
 
     if not scheme_content:
-        print("Could not extract useful scheme information.")
         print(
-            "Cache will not be updated so it can be retried later."
+            "Could not extract useful "
+            "scheme information."
         )
 
-        return "failed", gemini_requests, False, []
+        print(
+            "Cache will not be updated so "
+            "it can be retried later."
+        )
+
+        return (
+            "failed",
+            gemini_requests,
+            False,
+            [],
+            "Could not extract useful "
+            "scheme information.",
+        )
 
     print(
         f"Scheme-specific content: "
         f"{len(scheme_content)} characters"
     )
 
+    # -----------------------------------------------------
+    # Gemini request limit
+    # -----------------------------------------------------
+
     if gemini_requests >= MAX_GEMINI_REQUESTS:
-        print("Gemini request limit reached.")
+        print(
+            "Gemini request limit reached."
+        )
 
-        return "limit", gemini_requests, True, []
+        return (
+            "limit",
+            gemini_requests,
+            True,
+            [],
+            "Gemini request limit reached.",
+        )
 
-    print("Sending scheme information to Gemini...")
+    # -----------------------------------------------------
+    # Gemini analysis
+    # -----------------------------------------------------
+
+    print(
+        "Sending scheme information to Gemini..."
+    )
 
     gemini_requests += 1
 
@@ -323,13 +458,29 @@ def process_scheme(
 
     if not analysis:
         print(
-            f"AI analysis failed for {scheme_name}."
+            f"AI analysis failed for "
+            f"{scheme_name}."
         )
-        print("Cache will not be updated.")
 
-        return "failed", gemini_requests, False, []
+        print(
+            "Cache will not be updated."
+        )
 
-    print("AI analysis successful.")
+        return (
+            "failed",
+            gemini_requests,
+            False,
+            [],
+            "AI analysis failed.",
+        )
+
+    print(
+        "AI analysis successful."
+    )
+
+    # -----------------------------------------------------
+    # Compare current data with AI result
+    # -----------------------------------------------------
 
     changes = compare_scheme(
         scheme,
@@ -338,13 +489,19 @@ def process_scheme(
 
     print_changes(changes)
 
+    # -----------------------------------------------------
+    # Handle changes
+    # -----------------------------------------------------
+
     if changes:
         print(
             f"{len(changes)} change(s) detected."
         )
 
         if AUTO_UPDATE:
-            print("Automatic update is enabled.")
+            print(
+                "Automatic update is enabled."
+            )
 
             try:
                 from updater import update_scheme
@@ -355,36 +512,53 @@ def process_scheme(
                 )
 
                 if not result:
-                    print("Update failed.")
+                    print(
+                        "Update failed."
+                    )
 
                     return (
                         "failed",
                         gemini_requests,
                         False,
                         changes,
+                        "Backend database update failed.",
                     )
 
-                print("Changes sent to backend.")
+                print(
+                    "Changes sent to backend."
+                )
 
             except Exception as error:
-                print(f"Updater error: {error}")
+                print(
+                    f"Updater error: {error}"
+                )
 
                 return (
                     "failed",
                     gemini_requests,
                     False,
                     changes,
+                    f"Updater error: {error}",
                 )
 
         else:
-            print("Automatic update is disabled.")
             print(
-                "Changes were detected but not written "
-                "to the database."
+                "Automatic update is disabled."
+            )
+
+            print(
+                "Changes were detected but "
+                "not written to the database."
             )
 
     else:
-        print("Scheme is already up to date.")
+        print(
+            "Scheme is already up to date."
+        )
+
+    # -----------------------------------------------------
+    # Save content hash
+    # -----------------------------------------------------
 
     save_scheme_hash(
         scheme_id,
@@ -392,7 +566,13 @@ def process_scheme(
         content_hash,
     )
 
-    print("Webpage fingerprint saved.")
+    print(
+        "Webpage fingerprint saved."
+    )
+
+    # -----------------------------------------------------
+    # Final status
+    # -----------------------------------------------------
 
     if changes:
         return (
@@ -400,6 +580,7 @@ def process_scheme(
             gemini_requests,
             False,
             changes,
+            None,
         )
 
     return (
@@ -407,6 +588,7 @@ def process_scheme(
         gemini_requests,
         False,
         [],
+        None,
     )
 
 
@@ -430,7 +612,8 @@ def send_report(report):
 
     except Exception as error:
         print(
-            f"\n⚠️ Email report could not be sent: {error}"
+            f"\n⚠️ Email report could not be sent: "
+            f"{error}"
         )
 
 
@@ -460,6 +643,10 @@ def main():
         f"{'ENABLED' if AUTO_UPDATE else 'DISABLED'}"
     )
 
+    # -----------------------------------------------------
+    # Get schemes
+    # -----------------------------------------------------
+
     schemes = get_all_schemes()
 
     if not schemes:
@@ -469,10 +656,13 @@ def main():
             "schemes_checked": 0,
             "updated": [],
             "unchanged": 0,
+            "source_unavailable": [],
             "failed": [],
             "skipped": 0,
             "gemini_requests": 0,
             "runtime": 0,
+            "automatic_update": AUTO_UPDATE,
+            "limit_reached": False,
         })
 
         return
@@ -481,69 +671,103 @@ def main():
         f"\nFound {len(schemes)} scheme(s)."
     )
 
+    # -----------------------------------------------------
+    # Validate schemes
+    # -----------------------------------------------------
+
     valid_schemes = []
 
     for scheme in schemes:
         scheme_id = scheme.get("scheme_id")
+
         scheme_name = scheme.get(
             "name",
             scheme_id,
         )
-        source_url = scheme.get("source_url")
+
+        source_url = scheme.get(
+            "source_url"
+        )
 
         if not scheme_id:
             print(
-                "Scheme skipped: missing scheme_id."
+                "Scheme skipped: "
+                "missing scheme_id."
             )
             continue
 
         if not scheme_name:
             print(
-                f"Scheme {scheme_id} skipped: missing name."
+                f"Scheme {scheme_id} skipped: "
+                f"missing name."
             )
             continue
 
         if not source_url:
             print(
-                f"{scheme_name} skipped: missing source_url."
+                f"{scheme_name} skipped: "
+                f"missing source_url."
             )
             continue
 
         valid_schemes.append(scheme)
 
     if not valid_schemes:
-        print("No valid schemes available.")
+        print(
+            "No valid schemes available."
+        )
 
         send_report({
             "schemes_checked": len(schemes),
             "updated": [],
             "unchanged": 0,
+            "source_unavailable": [],
             "failed": [],
             "skipped": len(schemes),
             "gemini_requests": 0,
             "runtime": 0,
+            "automatic_update": AUTO_UPDATE,
+            "limit_reached": False,
         })
 
         return
+
+    # -----------------------------------------------------
+    # Scrape unique URLs
+    # -----------------------------------------------------
 
     scraped_results = scrape_all_unique_urls(
         valid_schemes
     )
 
+    # -----------------------------------------------------
+    # Counters
+    # -----------------------------------------------------
+
     successful = 0
     failed = 0
     changed = 0
     unchanged = 0
+    source_unavailable = 0
     skipped = 0
 
     gemini_requests = 0
     limit_reached = False
 
-    # Data collected specifically for the email report.
+    # -----------------------------------------------------
+    # Data collected for email report
+    # -----------------------------------------------------
+
     updated_schemes = []
     failed_schemes = []
+    unavailable_schemes = []
+
+    # -----------------------------------------------------
+    # Process schemes
+    # -----------------------------------------------------
 
     for scheme in valid_schemes:
+
         scheme_name = scheme.get(
             "name",
             scheme.get(
@@ -553,18 +777,25 @@ def main():
         )
 
         try:
+
             (
                 status,
                 gemini_requests,
                 hit_limit,
                 changes,
+                reason,
             ) = process_scheme(
                 scheme,
                 scraped_results,
                 gemini_requests,
             )
 
+            # -------------------------------------------------
+            # Scheme changed and updated
+            # -------------------------------------------------
+
             if status == "changed":
+
                 successful += 1
                 changed += 1
 
@@ -576,14 +807,51 @@ def main():
                     "changes": changes,
                 })
 
+            # -------------------------------------------------
+            # Scheme analyzed but no changes
+            # -------------------------------------------------
+
             elif status == "analyzed":
+
                 successful += 1
 
+            # -------------------------------------------------
+            # Website unchanged
+            # -------------------------------------------------
+
             elif status == "unchanged":
+
                 successful += 1
                 unchanged += 1
 
+            # -------------------------------------------------
+            # Source unavailable
+            # -------------------------------------------------
+
+            elif status == "source_unavailable":
+
+                source_unavailable += 1
+
+                unavailable_schemes.append({
+                    "scheme": scheme_name,
+                    "scheme_id": scheme.get(
+                        "scheme_id"
+                    ),
+                    "source_url": scheme.get(
+                        "source_url"
+                    ),
+                    "reason": reason or (
+                        "Source website could not "
+                        "be reached."
+                    ),
+                })
+
+            # -------------------------------------------------
+            # Genuine processing failure
+            # -------------------------------------------------
+
             elif status == "failed":
+
                 failed += 1
 
                 failed_schemes.append({
@@ -591,13 +859,17 @@ def main():
                     "scheme_id": scheme.get(
                         "scheme_id"
                     ),
-                    "reason": "Processing failed.",
+                    "reason": reason or (
+                        "Processing failed."
+                    ),
                 })
 
-                # If changes were detected but the backend
-                # update failed, preserve those changes
+                # If changes were detected but the
+                # backend update failed, preserve them
                 # in the email report.
+
                 if changes:
+
                     updated_schemes.append({
                         "scheme": scheme_name,
                         "scheme_id": scheme.get(
@@ -606,10 +878,20 @@ def main():
                         "changes": changes,
                     })
 
+            # -------------------------------------------------
+            # Skipped
+            # -------------------------------------------------
+
             elif status == "skipped":
+
                 skipped += 1
 
+            # -------------------------------------------------
+            # Gemini limit
+            # -------------------------------------------------
+
             elif status == "limit":
+
                 limit_reached = True
 
                 failed_schemes.append({
@@ -617,13 +899,20 @@ def main():
                     "scheme_id": scheme.get(
                         "scheme_id"
                     ),
-                    "reason": "Gemini request limit reached.",
+                    "reason": reason or (
+                        "Gemini request limit reached."
+                    ),
                 })
+
+            # -------------------------------------------------
+            # Check limit flag
+            # -------------------------------------------------
 
             if hit_limit:
                 limit_reached = True
 
         except Exception as error:
+
             failed += 1
 
             failed_schemes.append({
@@ -639,9 +928,18 @@ def main():
                 f"{scheme_name}: {error}"
             )
 
+    # -----------------------------------------------------
+    # Runtime
+    # -----------------------------------------------------
+
     elapsed_time = (
-        time.perf_counter() - start_time
+        time.perf_counter()
+        - start_time
     )
+
+    # -----------------------------------------------------
+    # Scraping statistics
+    # -----------------------------------------------------
 
     unique_url_count = len(
         scraped_results
@@ -658,6 +956,9 @@ def main():
         - successful_scrapes
     )
 
+    # -----------------------------------------------------
+    # FINAL SUMMARY
+    # -----------------------------------------------------
 
     print("\n" + "=" * 60)
     print("FINAL SUMMARY")
@@ -686,6 +987,11 @@ def main():
     print(
         f"Unchanged                 : "
         f"{unchanged}"
+    )
+
+    print(
+        f"Source unavailable        : "
+        f"{source_unavailable}"
     )
 
     print(
@@ -736,10 +1042,15 @@ def main():
 
     print("=" * 60)
 
+    # -----------------------------------------------------
+    # EMAIL REPORT
+    # -----------------------------------------------------
+
     report = {
         "schemes_checked": len(valid_schemes),
         "updated": updated_schemes,
         "unchanged": unchanged,
+        "source_unavailable": unavailable_schemes,
         "failed": failed_schemes,
         "skipped": skipped,
         "gemini_requests": gemini_requests,
@@ -750,6 +1061,10 @@ def main():
 
     send_report(report)
 
+
+# =========================================================
+# ENTRY POINT
+# =========================================================
 
 if __name__ == "__main__":
     main()

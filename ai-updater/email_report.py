@@ -8,37 +8,24 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-# =========================================================
-# CONFIGURATION
-# =========================================================
-
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 REPORT_EMAIL = os.getenv("REPORT_EMAIL")
 REPORT_FROM_EMAIL = os.getenv("REPORT_FROM_EMAIL")
 
 
-# =========================================================
-# HELPERS
-# =========================================================
-
 def format_value(value):
     """Convert a value into safe, readable HTML text."""
-
     if value is None:
         return "Not specified"
 
     if isinstance(value, bool):
         return "Yes" if value else "No"
 
-    if isinstance(value, (dict, list)):
-        return html.escape(str(value))
-
     return html.escape(str(value))
 
 
 def build_changes_html(updated_schemes):
     """Build the changes section of the email."""
-
     if not updated_schemes:
         return """
         <div class="empty">
@@ -54,26 +41,17 @@ def build_changes_html(updated_schemes):
         )
 
         changes = scheme.get("changes", [])
-
         change_rows = []
 
         for change in changes:
             field = format_value(
                 change.get("field", "Unknown field")
             )
-
-            old_value = format_value(
-                change.get("old_value")
-            )
-
-            new_value = format_value(
-                change.get("new_value")
-            )
-
+            old_value = format_value(change.get("old_value"))
+            new_value = format_value(change.get("new_value"))
             confidence = format_value(
                 change.get("confidence", "Not specified")
             )
-
             evidence = format_value(
                 change.get("evidence", "Not available")
             )
@@ -122,8 +100,7 @@ def build_changes_html(updated_schemes):
 
 
 def build_failures_html(failed_schemes):
-    """Build the failures section of the email."""
-
+    """Build the processing failures section."""
     if not failed_schemes:
         return ""
 
@@ -133,7 +110,6 @@ def build_failures_html(failed_schemes):
         scheme_name = format_value(
             failure.get("scheme", "Unknown Scheme")
         )
-
         reason = format_value(
             failure.get("reason", "Unknown error")
         )
@@ -148,90 +124,104 @@ def build_failures_html(failed_schemes):
         )
 
     return f"""
-    <h2>Failed Schemes</h2>
-
+    <h2>Processing Failures</h2>
     <div class="failure-section">
         {''.join(sections)}
     </div>
     """
 
 
-# =========================================================
-# EMAIL HTML
-# =========================================================
+def build_unavailable_html(unavailable_schemes):
+    """Build the source unavailable section."""
+    if not unavailable_schemes:
+        return ""
+
+    sections = []
+
+    for unavailable in unavailable_schemes:
+        scheme_name = format_value(
+            unavailable.get("scheme", "Unknown Scheme")
+        )
+        scheme_id = format_value(
+            unavailable.get("scheme_id", "Not specified")
+        )
+        source_url = format_value(
+            unavailable.get("source_url", "Not available")
+        )
+        reason = format_value(
+            unavailable.get(
+                "reason",
+                "Source website could not be reached."
+            )
+        )
+
+        sections.append(
+            f"""
+            <div class="unavailable">
+                <strong>{scheme_name}</strong>
+
+                <p>
+                    <strong>Scheme ID:</strong> {scheme_id}
+                </p>
+
+                <p>
+                    <strong>Reason:</strong> {reason}
+                </p>
+
+                <p class="source">
+                    <strong>Source:</strong><br>
+                    {source_url}
+                </p>
+            </div>
+            """
+        )
+
+    return f"""
+    <h2>Source Unavailable</h2>
+    <div class="unavailable-section">
+        {''.join(sections)}
+    </div>
+    """
+
 
 def build_email_html(report):
     """Create the complete HTML email."""
 
-    schemes_checked = report.get(
-        "schemes_checked",
-        0,
-    )
-
-    updated = report.get(
-        "updated",
-        [],
-    )
-
-    unchanged = report.get(
-        "unchanged",
-        0,
-    )
-
-    failed = report.get(
-        "failed",
-        [],
-    )
-
-    skipped = report.get(
-        "skipped",
-        0,
-    )
-
-    gemini_requests = report.get(
-        "gemini_requests",
-        0,
-    )
-
-    runtime = report.get(
-        "runtime",
-        0,
-    )
-
-    automatic_update = report.get(
-        "automatic_update",
-        False,
-    )
-
-    limit_reached = report.get(
-        "limit_reached",
-        False,
-    )
+    schemes_checked = report.get("schemes_checked", 0)
+    updated = report.get("updated", [])
+    unchanged = report.get("unchanged", 0)
+    failed = report.get("failed", [])
+    source_unavailable = report.get("source_unavailable", [])
+    skipped = report.get("skipped", 0)
+    gemini_requests = report.get("gemini_requests", 0)
+    runtime = report.get("runtime", 0)
+    automatic_update = report.get("automatic_update", False)
+    limit_reached = report.get("limit_reached", False)
 
     updated_count = len(updated)
     failed_count = len(failed)
+    unavailable_count = len(source_unavailable)
 
     if failed_count > 0:
-        status = "Completed with failures"
+        status = "Completed with processing errors"
+    elif unavailable_count > 0:
+        status = "Completed with unavailable sources"
     elif updated_count > 0:
         status = f"{updated_count} scheme(s) updated"
     else:
         status = "No changes detected"
 
     changes_html = build_changes_html(updated)
+    unavailable_html = build_unavailable_html(source_unavailable)
     failures_html = build_failures_html(failed)
 
     return f"""
 <!DOCTYPE html>
-
 <html>
-
 <head>
-
 <meta charset="UTF-8">
 
 <style>
-
 body {{
     margin: 0;
     padding: 0;
@@ -383,6 +373,34 @@ h2 {{
     color: #4b5563;
 }}
 
+.unavailable-section {{
+    margin-top: 10px;
+    margin-bottom: 28px;
+}}
+
+.unavailable {{
+    margin-bottom: 12px;
+    padding: 14px;
+    border: 1px solid #fde68a;
+    background: #fffbeb;
+    border-radius: 9px;
+}}
+
+.unavailable p {{
+    margin: 6px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+}}
+
+.unavailable .source {{
+    margin-top: 10px;
+    padding: 10px;
+    background: #ffffff;
+    border-radius: 7px;
+    word-break: break-word;
+    color: #4b5563;
+}}
+
 .failure-section {{
     margin-top: 10px;
 }}
@@ -398,6 +416,7 @@ h2 {{
 .failure p {{
     margin: 6px 0 0;
     font-size: 13px;
+    line-height: 1.5;
 }}
 
 .info {{
@@ -437,9 +456,7 @@ h2 {{
         text-align: center;
         transform: rotate(90deg);
     }}
-
 }}
-
 </style>
 
 </head>
@@ -449,7 +466,6 @@ h2 {{
 <div class="container">
 
     <div class="header">
-
         <h1>ThittamThunai</h1>
 
         <p>
@@ -459,7 +475,6 @@ h2 {{
         <div class="status">
             {html.escape(status)}
         </div>
-
     </div>
 
     <div class="content">
@@ -484,7 +499,12 @@ h2 {{
             </div>
 
             <div class="stat">
-                <span>Failed</span>
+                <span>Source Unavailable</span>
+                <strong>{unavailable_count}</strong>
+            </div>
+
+            <div class="stat">
+                <span>Processing Failures</span>
                 <strong>{failed_count}</strong>
             </div>
 
@@ -503,6 +523,8 @@ h2 {{
         <h2>Changes Detected</h2>
 
         {changes_html}
+
+        {unavailable_html}
 
         {failures_html}
 
@@ -526,23 +548,16 @@ h2 {{
     </div>
 
     <div class="footer">
-
         Automatically generated by the
         ThittamThunai AI Scheme Updater.
-
     </div>
 
 </div>
 
 </body>
-
 </html>
 """
 
-
-# =========================================================
-# SEND EMAIL
-# =========================================================
 
 def send_daily_report(report):
     """Send the daily updater report through Resend."""
@@ -563,27 +578,22 @@ def send_daily_report(report):
 
     resend.api_key = RESEND_API_KEY
 
-    updated_count = len(
-        report.get("updated", [])
-    )
-
-    failed_count = len(
-        report.get("failed", [])
+    updated_count = len(report.get("updated", []))
+    failed_count = len(report.get("failed", []))
+    unavailable_count = len(
+        report.get("source_unavailable", [])
     )
 
     if failed_count > 0:
         status = "Completed with failures"
+    elif unavailable_count > 0:
+        status = "Completed with unavailable sources"
     elif updated_count > 0:
-        status = (
-            f"{updated_count} Scheme(s) Updated"
-        )
+        status = f"{updated_count} Scheme(s) Updated"
     else:
         status = "No Changes"
 
-    subject = (
-        f"ThittamThunai AI Updater — {status}"
-    )
-
+    subject = f"ThittamThunai AI Updater — {status}"
     html_content = build_email_html(report)
 
     try:
@@ -610,10 +620,6 @@ def send_daily_report(report):
 
         return False
 
-
-# =========================================================
-# TEST
-# =========================================================
 
 if __name__ == "__main__":
     print(
