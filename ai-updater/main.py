@@ -34,6 +34,67 @@ MAX_SCRAPE_WORKERS = 5
 # Keep disabled unless automatic database updates are intentionally required.
 AUTO_UPDATE = True
 
+# =========================================================
+# FALLBACK SOURCE URLS
+# =========================================================
+# These are used only when a scheme's database source_url
+# cannot be scraped. They are official Government of Tamil
+# Nadu sources selected for the affected schemes.
+#
+# The database remains the source of the primary URL.
+# Fallbacks are intentionally kept here so no DB changes
+# are required.
+#
+# IMPORTANT:
+# - SCH003-SCH006 use the official Differently Abled
+#   Welfare Department special education page.
+# - SCH008 uses the official Welfare Board page.
+# - SCH013-SCH020 use the official IT Department e-District
+#   page.
+# - SCH024 uses an official 2025 DIPR page containing
+#   information about the scheme.
+FALLBACK_URLS = {
+    "SCH003": [
+        "https://www.scd.tn.gov.in/specialedu.php",
+    ],
+    "SCH004": [
+        "https://www.scd.tn.gov.in/specialedu.php",
+    ],
+    "SCH005": [
+        "https://www.scd.tn.gov.in/specialedu.php",
+    ],
+    "SCH006": [
+        "https://www.scd.tn.gov.in/specialedu.php",
+    ],
+    "SCH008": [
+        "https://www.scd.tn.gov.in/tn_welfare.php",
+    ],
+    "SCH013": [
+        "https://it.tn.gov.in/en/TNEGA/e-District",
+    ],
+    "SCH014": [
+        "https://it.tn.gov.in/en/TNEGA/e-District",
+    ],
+    "SCH015": [
+        "https://it.tn.gov.in/en/TNEGA/e-District",
+    ],
+    "SCH016": [
+        "https://it.tn.gov.in/en/TNEGA/e-District",
+    ],
+    "SCH018": [
+        "https://it.tn.gov.in/en/TNEGA/e-District",
+    ],
+    "SCH019": [
+        "https://it.tn.gov.in/en/TNEGA/e-District",
+    ],
+    "SCH020": [
+        "https://it.tn.gov.in/en/TNEGA/e-District",
+    ],
+    "SCH024": [
+        "https://dipr.tn.gov.in/ords/r/dipr/info-prdept103/press-release1?cs=1NDdLYMxraFjtkzHQk3MjQkPKm23iLkvwoJ6fnxhrJyggAsb91l6hLpoijjVtvLoX0llW0atwfd7G_0MS3v2prQ&p33_file_id=14641&request=APPLICATION_PROCESS%3DGET_FILE&session=725425116646127",
+    ],
+}
+
 
 # =========================================================
 # BACKEND
@@ -161,7 +222,20 @@ def scrape_unique_url(url):
 
 
 def scrape_all_unique_urls(schemes):
-    """Scrape each unique source URL only once."""
+    """
+    Scrape each unique primary URL only once.
+
+    If a scheme's primary source cannot be scraped, its
+    configured fallback URLs are tried in order.
+
+    The returned result is keyed by the scheme's primary
+    normalized URL so the rest of the updater remains
+    compatible with the existing database/API structure.
+    """
+
+    # -----------------------------------------------------
+    # Build primary URL list
+    # -----------------------------------------------------
 
     unique_urls = set()
 
@@ -191,6 +265,10 @@ def scrape_all_unique_urls(schemes):
             f"Duplicate URLs avoided: "
             f"{len(schemes) - len(urls)}"
         )
+
+    # -----------------------------------------------------
+    # Scrape primary URLs
+    # -----------------------------------------------------
 
     results = {}
 
@@ -225,19 +303,184 @@ def scrape_all_unique_urls(schemes):
                     "success": False,
                 }
 
+    # -----------------------------------------------------
+    # Fallback scraping
+    # -----------------------------------------------------
+    # Only try a fallback when the primary URL failed.
+    # Fallbacks are deduplicated and scraped only once.
+    # -----------------------------------------------------
+
+    fallback_candidates = {}
+
+    for scheme in schemes:
+        scheme_id = scheme.get("scheme_id")
+        source_url = scheme.get("source_url")
+
+        if not scheme_id or not source_url:
+            continue
+
+        primary_url = normalize_url(source_url)
+
+        if not primary_url:
+            continue
+
+        primary_result = results.get(primary_url)
+
+        if primary_result and primary_result.get("success"):
+            continue
+
+        fallback_urls = FALLBACK_URLS.get(scheme_id, [])
+
+        if not fallback_urls:
+            continue
+
+        for fallback_url in fallback_urls:
+            normalized_fallback = normalize_url(fallback_url)
+
+            if not normalized_fallback:
+                continue
+
+            if normalized_fallback == primary_url:
+                continue
+
+            fallback_candidates.setdefault(
+                normalized_fallback,
+                set(),
+            ).add(scheme_id)
+
+    if fallback_candidates:
+        print("\n" + "-" * 60)
+        print("FALLBACK SOURCE SCRAPING")
+        print("-" * 60)
+
+        for fallback_url, scheme_ids in fallback_candidates.items():
+            print(
+                f"Fallback: {fallback_url} "
+                f"(schemes: {', '.join(sorted(scheme_ids))})"
+            )
+
+        with ThreadPoolExecutor(
+            max_workers=MAX_SCRAPE_WORKERS
+        ) as executor:
+
+            future_to_fallback = {
+                executor.submit(
+                    scrape_unique_url,
+                    fallback_url,
+                ): fallback_url
+                for fallback_url in fallback_candidates
+            }
+
+            fallback_results = {}
+
+            for future in as_completed(future_to_fallback):
+                fallback_url = future_to_fallback[future]
+
+                try:
+                    fallback_results[fallback_url] = (
+                        future.result()
+                    )
+
+                except Exception as error:
+                    print(
+                        f"Unexpected fallback scraping error "
+                        f"for {fallback_url}: {error}"
+                    )
+
+                    fallback_results[fallback_url] = {
+                        "url": fallback_url,
+                        "text": None,
+                        "hash": None,
+                        "success": False,
+                    }
+
+        # -------------------------------------------------
+        # Attach the first successful fallback to each
+        # affected primary source result.
+        # -------------------------------------------------
+
+        for scheme in schemes:
+            scheme_id = scheme.get("scheme_id")
+            source_url = scheme.get("source_url")
+
+            if not scheme_id or not source_url:
+                continue
+
+            primary_url = normalize_url(source_url)
+
+            if not primary_url:
+                continue
+
+            primary_result = results.get(primary_url)
+
+            if primary_result and primary_result.get("success"):
+                continue
+
+            fallback_urls = FALLBACK_URLS.get(scheme_id, [])
+
+            for fallback_url in fallback_urls:
+                normalized_fallback = normalize_url(
+                    fallback_url
+                )
+
+                if not normalized_fallback:
+                    continue
+
+                fallback_result = fallback_results.get(
+                    normalized_fallback
+                )
+
+                if (
+                    fallback_result
+                    and fallback_result.get("success")
+                ):
+                    results[primary_url] = {
+                        "url": primary_url,
+                        "text": fallback_result["text"],
+                        "hash": fallback_result["hash"],
+                        "success": True,
+                        "used_fallback": True,
+                        "fallback_url": normalized_fallback,
+                    }
+
+                    print(
+                        f"\nFallback successful for "
+                        f"{scheme_id}:"
+                    )
+                    print(
+                        f"  Primary : {primary_url}"
+                    )
+                    print(
+                        f"  Fallback: {normalized_fallback}"
+                    )
+
+                    break
+
+    # -----------------------------------------------------
+    # Summary
+    # -----------------------------------------------------
+
     successful = sum(
         1
         for result in results.values()
         if result["success"]
     )
 
+    fallback_used = sum(
+        1
+        for result in results.values()
+        if result.get("success")
+        and result.get("used_fallback")
+    )
+
     print("\n" + "-" * 60)
     print("SCRAPING SUMMARY")
     print("-" * 60)
 
-    print(f"Unique URLs : {len(urls)}")
-    print(f"Successful  : {successful}")
-    print(f"Failed      : {len(urls) - successful}")
+    print(f"Unique primary URLs : {len(urls)}")
+    print(f"Successful          : {successful}")
+    print(f"Failed              : {len(urls) - successful}")
+    print(f"Fallbacks used      : {fallback_used}")
 
     return results
 
@@ -363,6 +606,15 @@ def process_scheme(
 
     scraped_text = scraped_result["text"]
     content_hash = scraped_result["hash"]
+
+    if scraped_result.get("used_fallback"):
+        print(
+            "Primary source was unavailable."
+        )
+        print(
+            f"Using fallback source: "
+            f"{scraped_result.get('fallback_url')}"
+        )
 
     # -----------------------------------------------------
     # Check cache
